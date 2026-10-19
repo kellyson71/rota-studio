@@ -32,11 +32,13 @@ jobs:
           node --check store.js
           node --check seed.js
           node --check config.js
+          node --check landing.js
       - name: Preparar site
         run: |
           mkdir -p dist
-          cp index.html style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
+          cp index.html painel.html landing.css landing.js style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
           cp -R kit dist/kit
+          cp -R assets dist/assets
       - name: Configurar Pages
         uses: actions/configure-pages@v5
       - name: Enviar arquivos
