@@ -29,6 +29,7 @@
     member: null,
     contacts: [],
     projects: [],
+    settings: {},
     error: "",
     onChange(fn) {
       listeners.add(fn);
@@ -97,6 +98,48 @@
     if (error) fail(error);
   };
 
+  Store.saveSettings = async data => {
+    Store.settings = data;
+    emit("settings");
+    if (Store.mode === "demo") return local.write("settings", data);
+    const { error } = await client.from("settings").upsert({ id: "config", data: { ...data, tab }, updated_by: Store.member?.name || null });
+    if (error) fail(error);
+  };
+
+  async function pullInbound() {
+    const { data, error } = await client.from("inbound").select("*").order("created_at");
+    if (error || !data?.length) return;
+    for (const lead of data) {
+      const id = "site-" + lead.id;
+      if (!Store.contacts.some(c => c.id === id)) {
+        const contact = {
+          id,
+          kind: "private",
+          order: 0,
+          name: lead.name,
+          phone: lead.phone,
+          category: lead.kind || "Chegou pelo site",
+          city: "",
+          channel: "WhatsApp",
+          status: "Respondeu",
+          owner: "",
+          priority: "Alta",
+          notes: lead.need ? `Pediu pelo site: ${lead.need}` : "Pediu contato pelo site.",
+          message: "Oi, {nome}! Aqui é {eu}, da Indexa. Vi sua mensagem no nosso site. Podemos conversar 10 minutos sobre o que você precisa?",
+          followupMessage: "Oi! Passando para saber se ainda faz sentido conversarmos sobre o seu projeto.",
+          person: lead.name.split(" ")[0],
+          source: "Formulário do site",
+          respondedAt: lead.created_at,
+          history: [{ text: "Pediu contato pelo site", type: "reply", actor: lead.name, at: lead.created_at }]
+        };
+        upsertLocal(Store.contacts, contact);
+        await write("contacts", contact);
+      }
+      await client.from("inbound").delete().eq("id", lead.id);
+    }
+    emit("inbound", data.length);
+  }
+
   Store.resetDemo = () => {
     Store.contacts = clone(window.SEED_CONTACTS);
     Store.projects = [];
@@ -135,18 +178,26 @@
       Store.ready = true;
       return emit("auth");
     }
-    const [contacts, projects] = await Promise.all([client.from("contacts").select("*"), client.from("projects").select("*")]);
+    const [contacts, projects, settings] = await Promise.all([client.from("contacts").select("*"), client.from("projects").select("*"), client.from("settings").select("*").eq("id", "config").maybeSingle()]);
+    Store.settings = settings.data?.data || {};
     if (contacts.error || projects.error) fail(contacts.error || projects.error);
     Store.contacts = (contacts.data || []).map(fromRow).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
     Store.projects = (projects.data || []).map(fromRow).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     Store.ready = true;
     subscribe();
     emit("load");
+    pullInbound();
   }
 
   function subscribe() {
     if (channel) client.removeChannel(channel);
     channel = client.channel("rota-sync");
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "settings" }, payload => {
+      if (payload.new?.data?.tab === tab) return;
+      Store.settings = payload.new?.data || {};
+      emit("settings");
+    });
+    channel.on("postgres_changes", { event: "INSERT", schema: "public", table: "inbound" }, () => pullInbound());
     for (const table of ["contacts", "projects"]) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, payload => {
         const list = Store[table];
@@ -170,6 +221,7 @@
     if (Store.mode === "demo") {
       Store.contacts = local.read("contacts", null) || clone(window.SEED_CONTACTS);
       Store.projects = local.read("projects", []);
+      Store.settings = local.read("settings", {});
       Store.ready = true;
       return emit("load");
     }

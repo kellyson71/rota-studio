@@ -79,3 +79,54 @@ end $$;
 
 insert into public.members (email, name) values ('kellyson@rota-studio.app', 'Kellyson'), ('jeyce@rota-studio.app', 'Jeyce')
 on conflict (email) do nothing;
+
+create table if not exists public.settings (
+  id text primary key,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
+
+create table if not exists public.inbound (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 2 and 120),
+  phone text not null check (char_length(phone) between 8 and 40),
+  need text check (char_length(need) <= 1000),
+  kind text check (char_length(kind) <= 60),
+  created_at timestamptz not null default now()
+);
+
+alter table public.settings enable row level security;
+alter table public.inbound enable row level security;
+
+revoke all on public.settings, public.inbound from anon;
+grant select, insert, update on public.settings to authenticated;
+grant select, delete on public.inbound to authenticated;
+grant insert (name, phone, need, kind) on public.inbound to anon, authenticated;
+
+drop policy if exists settings_all on public.settings;
+create policy settings_all on public.settings for all to authenticated using (public.is_member()) with check (public.is_member());
+
+drop policy if exists inbound_read on public.inbound;
+create policy inbound_read on public.inbound for select to authenticated using (public.is_member());
+drop policy if exists inbound_delete on public.inbound;
+create policy inbound_delete on public.inbound for delete to authenticated using (public.is_member());
+drop policy if exists inbound_insert on public.inbound;
+create policy inbound_insert on public.inbound for insert to anon, authenticated with check (true);
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'settings') then
+    alter publication supabase_realtime add table public.settings;
+  end if;
+end $$;
+
+insert into public.settings (id, data, updated_by) values ('config', '{"weeklyGoal": {"Kellyson": 8, "Jeyce": 8}, "returnDays": 3, "followupDays": 5}', 'importação')
+on conflict (id) do nothing;
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'inbound') then
+    alter publication supabase_realtime add table public.inbound;
+  end if;
+end $$;
