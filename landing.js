@@ -70,6 +70,7 @@ $("#toc").innerHTML = PROJECTS.map((p, i) => `
       <span class="toc-lead" aria-hidden="true"></span>
       <span class="toc-client">${esc(p.client)}</span>
       <span class="toc-year">${p.year}</span>
+      <span class="toc-more"><span class="t-open">Ver telas</span><span class="t-close">Fechar</span></span>
       <span class="toc-plus" aria-hidden="true"></span>
     </button>
     <div class="toc-body" id="toc-${p.id}" ${i ? "hidden" : ""}>
@@ -204,6 +205,8 @@ if (hasGsap && !reduce) {
   gsap.fromTo(".g-row.r2", { xPercent: -30 }, { xPercent: -8, ease: "none", scrollTrigger: { trigger: ".gallery", start: "top bottom", end: "bottom top", scrub: true } });
 
   gsap.from("#toc > li", { y: 40, opacity: 0, duration: 0.7, stagger: 0.07, ease: "power3.out", scrollTrigger: { trigger: "#toc", start: "top 85%" } });
+  gsap.from(".pack", { y: 70, opacity: 0, duration: 0.9, stagger: 0.12, ease: "power3.out", scrollTrigger: { trigger: ".pack-grid", start: "top 85%" } });
+  gsap.from(".hint-click", { y: 14, opacity: 0, duration: 0.6, scrollTrigger: { trigger: ".hint-click", start: "top 90%" } });
   gsap.from(".service", { y: 60, opacity: 0, rotate: 2, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".service-grid", start: "top 85%" } });
 
   gsap.fromTo(".steps-line path", { strokeDashoffset: 1000 }, { strokeDashoffset: 0, ease: "none", scrollTrigger: { trigger: ".steps-wrap", start: "top 75%", end: "bottom 55%", scrub: true } });
@@ -219,6 +222,21 @@ if (hasGsap && !reduce) {
   $$(".hero .mark").forEach(m => m.classList.add("on"));
   $$(".before").forEach(b => b.style.setProperty("--strike", "100%"));
 }
+
+const WA_NUMBER = (window.ROTA_CONFIG || {}).whatsapp;
+if (WA_NUMBER) {
+  $$("[data-wa]").forEach(a => {
+    a.href = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(a.dataset.wa)}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+  });
+}
+const waFloat = $(".wa-float");
+const heroEnd = () => $(".hero").getBoundingClientRect().bottom;
+const contactTop = () => $("#contato").getBoundingClientRect().top;
+const syncFloat = () => waFloat.classList.toggle("on", heroEnd() < 0 && contactTop() > innerHeight * 0.6);
+addEventListener("scroll", syncFloat, { passive: true });
+syncFloat();
 
 $$(".faq details").forEach(d => d.addEventListener("toggle", () => { if (d.open) $$(".faq details").forEach(o => { if (o !== d) o.open = false; }); }));
 
