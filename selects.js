@@ -1,6 +1,8 @@
 (() => {
     let current = null, scheduled = false;
     const styles = {
+        "": [ "?", "person-none" ],
+        "Ninguém": [ "?", "person-none" ],
         Baixa: [ "↓", "status-new" ],
         Normal: [ "−", "status-new" ],
         Alta: [ "↑", "status-wait" ],
@@ -49,7 +51,7 @@
         trigger.querySelector(".select-icon").textContent = icon;
         trigger.querySelector(".select-label").textContent = label;
         trigger.className = "select-trigger " + select.dataset.originalClass;
-        if (select.dataset.status) trigger.className = "select-trigger row-select " + color;
+        if (select.dataset.field === "status") trigger.className = "select-trigger row-select " + color;
         trigger.setAttribute("aria-label", (select.getAttribute("aria-label") || select.labels?.[0]?.textContent || "Selecionar") + ": " + label);
         trigger.title = label;
     }
@@ -66,7 +68,7 @@
         menu.setAttribute("aria-label", select.getAttribute("aria-label") || select.labels?.[0]?.textContent || "Opções");
         const heading = document.createElement("div");
         heading.className = "select-menu-heading";
-        heading.textContent = select.dataset.status || select.id === "detail-status" ? "ATUALIZAR STATUS" : select.dataset.owner || select.id?.includes("owner") ? "QUEM CUIDA" : "SELECIONE UMA OPÇÃO";
+        heading.textContent = select.dataset.field === "status" ? "MUDAR ETAPA" : select.dataset.field === "owner" || select.name === "owner" ? "QUEM CUIDA" : "SELECIONE UMA OPÇÃO";
         menu.append(heading);
         Array.from(select.options).forEach((option, i) => {
             const b = document.createElement("button");
