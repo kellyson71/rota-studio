@@ -1002,13 +1002,13 @@ function libraryPage() {
 
 function authPage() {
   if (Store.user && !Store.member) {
-    return `<section class="auth rise" style="--i:0"><div class="big-emoji">🚪</div><h1>Quase lá.</h1><p>Você entrou como <strong>${esc(Store.user.email)}</strong>, mas esse e-mail ainda não está na lista da dupla.</p><p class="hint">Peça para adicionar o e-mail na tabela <code>members</code> do Supabase.</p><button class="btn" data-action="sign-out" type="button">Sair</button></section>`;
+    return `<section class="auth rise" style="--i:0"><div class="big-emoji">🚪</div><h1>Quase lá.</h1><p>Você entrou como <strong>${esc(Store.user.email)}</strong>, mas esse usuário ainda não está na lista da dupla.</p><p class="hint">Peça para adicionar o e-mail na tabela <code>members</code> do Supabase.</p><button class="btn" data-action="sign-out" type="button">Sair</button></section>`;
   }
   return `<section class="auth rise" style="--i:0">
     <span class="kicker">área restrita da dupla</span><h1>Entra aí 👋</h1><p>Só Kellyson e Jeyce passam daqui.</p>
     <form id="auth-form" class="form">
-      ${input("a-email", "email", "E-mail", "", "email", true)}${input("a-password", "password", "Senha", "", "password", true)}
-      <div class="form-actions"><button class="btn primary grow" type="submit" name="mode" value="in">Entrar</button><button class="btn" type="submit" name="mode" value="up">Criar conta</button></div>
+      <div class="field"><label for="a-user">Usuário</label><input id="a-user" name="user" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="kellyson ou jeyce" required></div>${input("a-password", "password", "Senha", "", "password", true)}
+      <div class="form-actions"><button class="btn primary grow" type="submit">Entrar</button></div>
       <p class="hint" id="auth-msg">${esc(Store.error || "")}</p>
     </form></section>`;
 }
@@ -1030,12 +1030,10 @@ function render() {
       const msg = $("#auth-msg");
       msg.textContent = "Um segundo…";
       try {
-        if (e.submitter?.value === "up") {
-          const logged = await Store.signUp(f.email, f.password);
-          msg.textContent = logged ? "" : "Conta criada! Confirme pelo link no seu e-mail e depois entre.";
-        } else await Store.signIn(f.email, f.password);
+        const user = f.user.trim().toLowerCase();
+        await Store.signIn(user.includes("@") ? user : `${user}@rota-studio.app`, f.password);
       } catch (err) {
-        msg.textContent = /invalid login/i.test(err.message) ? "E-mail ou senha não batem 🤔" : err.message;
+        msg.textContent = /invalid login/i.test(err.message) ? "Usuário ou senha não batem 🤔" : err.message;
       }
     };
     return;

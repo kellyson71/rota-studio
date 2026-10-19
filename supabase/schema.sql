@@ -77,5 +77,5 @@ begin
   end if;
 end $$;
 
-insert into public.members (email, name) values ('kellyson.medeiros.pdf@gmail.com', 'Kellyson')
+insert into public.members (email, name) values ('kellyson@rota-studio.app', 'Kellyson'), ('jeyce@rota-studio.app', 'Jeyce')
 on conflict (email) do nothing;

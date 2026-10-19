@@ -16,7 +16,7 @@ Central de freelas da dupla: quem já recebeu mensagem, quem respondeu, quem sum
 
 Para ligar, coloque a chave publicável (Project Settings › API Keys) em `config.js`. Sem a chave, o site roda em modo demonstração, salvando no navegador.
 
-Para liberar alguém: `insert into members (email, name) values ('email@exemplo.com', 'Jeyce');`
+Login por usuário: `kellyson` ou `jeyce` (vira `usuario@rota-studio.app` no Supabase Auth). Para liberar outra pessoa, crie o usuário no Auth e rode `insert into members (email, name) values ('nome@rota-studio.app', 'Nome');`
 
 ## Rodar local
 
