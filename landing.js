@@ -17,7 +17,7 @@ const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
 const hasGsap = typeof window.gsap !== "undefined" && typeof window.ScrollTrigger !== "undefined";
 if (hasGsap) document.documentElement.classList.add("motion");
 
-$("#screens").innerHTML = SHOW.map((p, i) => `<img src="assets/shots/${p.id}.webp" alt="Tela do sistema ${esc(p.name)}" width="1200" height="750" class="${i ? "" : "on"}" ${i ? 'loading="lazy"' : ""}>`).join("");
+$("#screens").innerHTML = SHOW.map((p, i) => `<img src="assets/shots/${p.id}.webp" alt="Tela do sistema ${esc(p.name)}" width="1200" height="750" class="${i ? "" : "on"}">`).join("");
 $("#show-dots").innerHTML = SHOW.map((p, i) => `<button type="button" role="tab" aria-label="${esc(p.name)}" aria-selected="${!i}" class="${i ? "" : "on"}"><i></i></button>`).join("");
 
 let current = 0;
@@ -205,12 +205,14 @@ if (hasGsap && !reduce) {
   });
   $$(".eyebrow:not(.hero .eyebrow)").forEach(e => gsap.from(e, { x: -20, opacity: 0, duration: 0.6, scrollTrigger: { trigger: e, start: "top 88%" } }));
 
+  const stWords = splitWords($(".statement-text"));
+  gsap.fromTo(stWords, { opacity: 0.12 }, { opacity: 1, stagger: 0.05, ease: "none", scrollTrigger: { trigger: ".statement", start: "top 80%", end: "bottom 55%", scrub: true } });
+  gsap.from(".statement .n", { scale: 0.6, rotate: -8, duration: 0.7, stagger: 0.12, ease: "back.out(2)", scrollTrigger: { trigger: ".statement", start: "top 70%" } });
   $$("[data-count]").forEach(el => {
     const end = Number(el.dataset.count);
     const obj = { v: 0 };
-    gsap.to(obj, { v: end, duration: 1.6, ease: "power2.out", scrollTrigger: { trigger: el, start: "top 90%" }, onUpdate: () => { el.textContent = Math.round(obj.v); } });
+    gsap.to(obj, { v: end, duration: 1.4, ease: "power2.out", scrollTrigger: { trigger: el, start: "top 85%" }, onUpdate: () => { el.textContent = Math.round(obj.v); } });
   });
-  gsap.from(".numbers > div", { y: 30, opacity: 0, duration: 0.7, stagger: 0.08, ease: "power3.out", scrollTrigger: { trigger: ".numbers", start: "top 90%" } });
 
   const mm = gsap.matchMedia();
   mm.add("(min-width: 900px)", () => {
