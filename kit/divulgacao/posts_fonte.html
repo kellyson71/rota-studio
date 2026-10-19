@@ -1,0 +1,128 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F7F8F4;--ink:#14231C;--muted:#5A6A60;--green:#2E6B4E;--soft:#E3ECE5;--line:#CFD8D0}
+*{box-sizing:border-box;margin:0}
+body{background:#888;font-family:"Public Sans",system-ui,sans-serif}
+.post{width:1080px;height:1350px;background:var(--bg);color:var(--ink);padding:96px 88px 80px;display:flex;flex-direction:column;gap:40px;position:relative;overflow:hidden}
+.top{font-family:"IBM Plex Mono",monospace;font-size:26px;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+h1{font-size:92px;padding-right:90px;line-height:1.04;font-weight:800;letter-spacing:-.02em}
+h2{font-size:72px;line-height:1.08;font-weight:800;letter-spacing:-.015em}
+p{font-size:40px;line-height:1.4;color:var(--ink);max-width:880px}
+.muted{color:var(--muted)}
+.big{font-family:"IBM Plex Mono",monospace;font-size:220px;font-weight:500;letter-spacing:-.04em;line-height:1;color:var(--green)}
+.steps{display:grid;gap:22px;list-style:none;padding:0}
+.steps li{display:grid;grid-template-columns:84px 1fr;gap:20px;align-items:baseline;font-size:40px;line-height:1.3;border-top:2px solid var(--line);padding-top:22px}
+.steps b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--green);font-size:34px}
+.foot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;font-size:26px;color:var(--muted);border-top:2px solid var(--ink);padding-top:24px}
+.foot b{color:var(--ink);font-weight:800;font-size:30px}
+.mark{position:absolute;right:88px;top:88px;width:76px;height:76px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.box{border:2px solid var(--line);border-radius:14px;padding:32px;font-size:36px;line-height:1.35;background:#fff}
+.box h3{font-size:28px;font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em}
+.box.on{border-color:var(--green);background:var(--soft)}
+.tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:24px;padding:6px 14px;border-radius:999px;background:var(--soft);color:var(--green)}
+.warn{position:absolute;left:0;right:0;top:0;background:#B7791F;color:#fff;font:600 22px "Public Sans";padding:10px 88px}
+</style></head><body>
+
+<template id="logo"><svg class="mark" viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="30" r="24" fill="#2E6B4E"/><rect x="34" y="44" width="8" height="28" rx="2" fill="#14231C"/><path d="M36 54h4M36 61h4" stroke="#F7F8F4" stroke-width="2"/></svg></template>
+
+<section class="post" id="p1">
+  <div class="top">Pau dos Ferros · RN</div>
+  <h1>Sistemas para as prefeituras do Alto Oeste.</h1>
+  <p>Seleção online, editais de cultura, matrícula escolar e ponto eletrônico. Feitos aqui, com suporte de quem está a uma hora de distância.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap"><span class="tag">Lei 14.133</span><span class="tag">LGPD</span><span class="tag">dispensa de pequeno valor</span></div>
+  <div class="foot"><span><b>Oiticica</b><br>sistemas para prefeituras</span><span>oiticica.com.br</span></div>
+</section>
+
+<section class="post" id="p2">
+  <div class="top">Processo seletivo</div>
+  <div class="big">7</div>
+  <h2>seleções na região pediram inscrição presencial desde 2025.</h2>
+  <p class="muted">Envelope lacrado, fila na secretaria, taxa paga no banco. Quem mora no sítio perde um dia para se inscrever.</p>
+  <div class="foot"><span>Levantamento em editais publicados por 4 prefeituras do Alto Oeste, out/2026</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p3">
+  <div class="top">Seleção online · como funciona</div>
+  <h2>Do edital ao resultado, sem papel.</h2>
+  <ul class="steps">
+    <li><b>01</b><span>O candidato se inscreve pelo celular e anexa os documentos em PDF.</span></li>
+    <li><b>02</b><span>A comissão confere documentos e pontua títulos numa tela só.</span></li>
+    <li><b>03</b><span>A classificação e o desempate saem prontos, com as reservas de vaga do edital.</span></li>
+    <li><b>04</b><span>Recurso pela internet, com prazo controlado e resposta registrada.</span></li>
+    <li><b>05</b><span>Listas em PDF prontas para o diário oficial.</span></li>
+  </ul>
+  <div class="foot"><span>Seletivo · seleção online para prefeituras</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p4">
+  <div class="warn">PUBLICAR SÓ DEPOIS DA AUTORIZAÇÃO POR ESCRITO DE PAU DOS FERROS</div>
+  <div class="top">Caso real</div>
+  <div class="big">439</div>
+  <h2>inscrições online no portal de estágio da Prefeitura de Pau dos Ferros.</h2>
+  <p class="muted">Nenhum envelope. A comissão analisou tudo pela tela e publicou o resultado em PDF.</p>
+  <div class="foot"><span>Sistema desenvolvido por Kellyson Medeiros</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p5">
+  <div class="top">Cultura · Política Nacional Aldir Blanc</div>
+  <h2>Edital de cultura sem formulário genérico e sem pasta compartilhada.</h2>
+  <div class="cols">
+    <div class="box"><h3>Hoje</h3>Formulário na internet, anexos em .docx para baixar, documentos por e-mail, planilha à mão.</div>
+    <div class="box on"><h3>Com o sistema</h3>Inscrição com anexos, vagas por cota, nota dos pareceristas, recursos e resultado num lugar só.</div>
+  </div>
+  <p class="muted">A PNAB repassa recursos aos municípios todo ano até 2027.</p>
+  <div class="foot"><span>Editais de cultura · mesmo sistema da seleção online</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p6">
+  <div class="top">Para servidores · Lei 14.133</div>
+  <h2>Como contratar um sistema de pequeno valor.</h2>
+  <ul class="steps">
+    <li><b>01</b><span>A secretaria registra a necessidade (documento de formalização da demanda).</span></li>
+    <li><b>02</b><span>Pesquisa de preços com propostas e contratos de outros órgãos.</span></li>
+    <li><b>03</b><span>Dispensa por valor até R$ 65.492,11 (2026), com aviso de 3 dias úteis.</span></li>
+    <li><b>04</b><span>Abaixo de R$ 16.373,03, a habilitação pode ser simplificada (art. 70, III).</span></li>
+    <li><b>05</b><span>Contrato ou nota de empenho, implantação e pagamento.</span></li>
+  </ul>
+  <div class="foot"><span>Valores do Decreto 12.807/2025</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p7">
+  <div class="top">LGPD</div>
+  <h2>Um seletivo guarda CPF, endereço e documentos de centenas de pessoas.</h2>
+  <ul class="steps">
+    <li><b>✓</b><span>Acesso só por usuário e senha de cada membro da comissão.</span></li>
+    <li><b>✓</b><span>Cópia de segurança diária e conexão criptografada.</span></li>
+    <li><b>✓</b><span>Os dados são da prefeitura e voltam para ela no fim do contrato.</span></li>
+  </ul>
+  <div class="foot"><span>Termo de tratamento de dados em todo contrato</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p8">
+  <div class="warn">CONFERIR ANTES: CITAR SISTEMAS DE PAU DOS FERROS SÓ COM AUTORIZAÇÃO</div>
+  <div class="top">Quem faz</div>
+  <h1 style="font-size:100px;margin-top:40px">Kellyson Medeiros</h1>
+  <p>Desenvolvedor de sistemas municipais desde 2023 e estudante de Análise e Desenvolvimento de Sistemas no IFRN Pau dos Ferros.</p>
+  <p class="muted">Já construiu sistemas de licenciamento ambiental, protocolo, trânsito e estágio em uso no serviço público.</p>
+  <div class="foot"><span>Suporte por e-mail e WhatsApp em horário comercial</span><span><b>Oiticica</b></span></div>
+</section>
+
+<section class="post" id="p9">
+  <div class="top">Em breve · março de 2027</div>
+  <h2>Ponto eletrônico pelo celular.</h2>
+  <p>Registro com foto e localização, folha de frequência pronta para o RH e relatório de faltas por secretaria.</p>
+  <div class="cols">
+    <div class="box"><h3>Servidor</h3>Bate o ponto no próprio celular, dentro do raio do local de trabalho.</div>
+    <div class="box"><h3>RH</h3>Fecha o mês com a frequência pronta, sem planilha.</div>
+  </div>
+  <div class="foot"><span>Peça uma demonstração</span><span><b>Oiticica</b></span></div>
+</section>
+
+<script>
+const t=document.getElementById('logo');
+document.querySelectorAll('.post').forEach(p=>p.appendChild(t.content.cloneNode(true)));
+document.querySelectorAll('.post .warn').forEach(w=>{w.parentElement.querySelector('.mark').style.top='120px'});
+</script>
+</body></html>

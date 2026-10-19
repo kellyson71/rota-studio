@@ -1,0 +1,27 @@
+# Roda o radar toda segunda-feira às 7h (horário de Brasília) e mostra o resultado na aba Actions do GitHub.
+# Coloque radar.py, contratos_regiao.json e esta pasta .github num repositório seu (pode ser privado).
+name: radar semanal
+on:
+  schedule:
+    - cron: "0 10 * * 1"   # 10h UTC = 7h em Brasília
+  workflow_dispatch: {}     # botão "Run workflow" para rodar na hora
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Rodar o radar
+        run: |
+          {
+            echo '## Abertas agora'; echo '```'; python3 radar.py; echo '```'
+            echo '## Publicadas nos últimos 7 dias'; echo '```'; python3 radar.py --novas 7; echo '```'
+            echo '## Contratos vencendo em 90 dias'; echo '```'; python3 radar.py --vencimentos 90; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radar
+          path: radar_*.csv
+          if-no-files-found: ignore

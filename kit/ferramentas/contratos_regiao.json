@@ -1,0 +1,722 @@
+[
+ {
+  "municipio": "Almino Afonso",
+  "categoria": "Protocolo e documentos",
+  "fornecedor": "SISTEMA INTEGRADOS APLICADO AO SETOR PUBLICO LTDA",
+  "valor": 14400.0,
+  "inicio": "2024-01-08",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa especializada para locação de software de gestão legislativa com protocolo geral e conteúdo WEB, para administração do site institucional da Prefeitura Municipal de Almino Afonso"
+ },
+ {
+  "municipio": "Almino Afonso",
+  "categoria": "Gestão integrada",
+  "fornecedor": "LEMOS E MARQUES LTDA",
+  "valor": 45000.0,
+  "inicio": "2024-01-08",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa especializada em licença (locação de software de gestão das rotinas de natureza no setor de Contabilidade e Licitações para manutenção das atividades da Prefeitura Municipal de Almino Afonso - RN"
+ },
+ {
+  "municipio": "Antônio Martins",
+  "categoria": "Compras e preços",
+  "fornecedor": "CESTA DE PRECOS - SOLUCOES TECNOLOGICAS E CAPACITACOES LTDA",
+  "valor": 7200.0,
+  "inicio": "2024-02-28",
+  "fim": "2024-12-31",
+  "objeto": "Contratação  de Empresa de locação de sistema software  e/ou ferramenta online para realização de  pesquisa de preços e elaboração de orçamentos, com base nos preços praticados pela administração pública, baseado em resultado de\r\nlicitações adjudicadas e homologadas"
+ },
+ {
+  "municipio": "Antônio Martins",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SIG SOFTWARE & CONSULTORIA EM TECNOLOGIA",
+  "valor": 21000.0,
+  "inicio": "2024-03-15",
+  "fim": "2024-12-31",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA NA PRESTAÇÃO DE SERVIÇOS CONTINUADOS DE SUSTENTAÇÃO, MANUNTEÇÃO, SUPORTE TÉCNICO E HOSPEDAGEM E MIGRAÇÃO DE DADOS DO SISTEMA INTEGRADO DE GESTÃO DE EDUCAÇÃO-SIGEDUC, SOLUÇÃO DESENVOLVIDA PELO GONVERNO DO ESTADO DO RIO GRANDE DO NORTE CEDIDO GRATUITAMENTE AO MUNIC"
+ },
+ {
+  "municipio": "Encanto",
+  "categoria": "Site",
+  "fornecedor": "49.135.439 VANESSA SUENIA OLIVEIRA DE SOUZA",
+  "valor": 9600.0,
+  "inicio": "2024-07-02",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa ou profissional especializado na prestação de serviços em de atualização de website institucional em www.encanto.rn.gov.br, com atualização e manutenção preventiva e corretiva e evolutiva do portal da transparência atendendo assim as necessidades da Prefeitura Municipal de Enc"
+ },
+ {
+  "municipio": "Rafael Godeiro",
+  "categoria": "Site",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADO AO SETOR PUBLICO LTDA",
+  "valor": 15400.0,
+  "inicio": "2024-02-08",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de Empresa especializada no fornecimento de licença de ambiente web que suporte o site oficial em atendimento as Leis que regem a transparência no Brasil"
+ },
+ {
+  "municipio": "Rafael Godeiro",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SIG SOFTWARE & CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA",
+  "valor": 17520.0,
+  "inicio": "2024-03-01",
+  "fim": "2024-12-31",
+  "objeto": "contratação de mão de obra especializada na prestação de serviços continuados de instalação, treinamento, sustentação, manutenção, suporte técnico e hospedagem do Sistema Integrado de Gestão de Educação – SIGEduc, solução desenvolvida pelo Governo do Estado do Rio Grande do Norte e cedida gratuitame"
+ },
+ {
+  "municipio": "Rafael Godeiro",
+  "categoria": "Gestão integrada",
+  "fornecedor": "KEILLA TAISE LOPES DE MATOS - ME",
+  "valor": 7000.0,
+  "inicio": "2024-06-03",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa especializada no fornecimento de direito de uso de sistema de gestão de ISSQN e emissão de Nota Fiscal Eletrônica"
+ },
+ {
+  "municipio": "Riacho da Cruz",
+  "categoria": "Diário oficial",
+  "fornecedor": "K D FRANCELINO",
+  "valor": 6000.0,
+  "inicio": "2024-01-25",
+  "fim": "2024-12-31",
+  "objeto": "CONTRATAÇÃO DE EMPRESA PARA LOCAÇÃO DE SERVIÇOS DE SOFTWARE, DE DIÁRIO OFICIAL ELETRÔNICO, COMPOSTO DE UM SISTEMA GERENCIADOR DE PUBLICAÇÃO."
+ },
+ {
+  "municipio": "Riacho da Cruz",
+  "categoria": "Outro",
+  "fornecedor": "ALVES E VIEIRA SERVIÇOS PARA GESTÃO PÚBLICA LTDA",
+  "valor": 31680.0,
+  "inicio": "2024-02-26",
+  "fim": "2024-12-31",
+  "objeto": "CONTRATAÇÃO DE EMPRESA PARA LOCAÇÃO DE SOFTWARE PARA ATENDIMENTO DAS NECESSIDADES DESENVOLVIDAS PELA SECRETARIA MUNICIPAL DE ADMINISTRAÇÃO."
+ },
+ {
+  "municipio": "São Francisco do Oeste",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADO AO SETOR PÚBLICO LTDA - ME",
+  "valor": 14300.0,
+  "inicio": "2024-02-02",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa especializada para prestação de serviço e implantação de solução de gestão escolar, incluindo: implantação do software público i-Educar, implantação de ferramentas administrativas integradas, portais de professor e serviços à comunidade escolar e gerenciamento inteligente. Inc"
+ },
+ {
+  "municipio": "Umarizal",
+  "categoria": "Site",
+  "fornecedor": "ASP-AUTOMACAO, SERVICOS E PORD.DE INFORMATICA LTDA",
+  "valor": 18000.0,
+  "inicio": "2024-01-15",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa destinada ao fornecimento de cessão de direito de uso de software de gestão integrada com módulo tributário e software de gestão de conteúdo website para esse município."
+ },
+ {
+  "municipio": "Umarizal",
+  "categoria": "Gestão escolar",
+  "fornecedor": "REDENET COMERCIO, SERVICOS DE TECNOLOGIA LIMITADA-ME",
+  "valor": 17400.0,
+  "inicio": "2024-01-15",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa para locação de uso da licença software de gestão educacional contemplando o modulo acadêmico para o município na Área de Educação para monitoramento das instituições escolares"
+ },
+ {
+  "municipio": "Umarizal",
+  "categoria": "Protocolo e documentos",
+  "fornecedor": "LEMOS E MARQUES LTDA",
+  "valor": 48000.0,
+  "inicio": "2024-01-15",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa especializada em licença (locação de software de gestão das rotinas de natureza no setor de Contabilidade/Licitações e protocolo para manutenção das atividades da Prefeitura Municipal de Umarizal - RN"
+ },
+ {
+  "municipio": "Umarizal",
+  "categoria": "Gestão integrada",
+  "fornecedor": "GPI GESTAO PUBLICA INTEGRADA LTDA",
+  "valor": 12000.0,
+  "inicio": "2024-01-15",
+  "fim": "2024-12-31",
+  "objeto": "Contratação de empresa para prestação de serviços de software Recursos Humanos/folha e os eventos do E-social para atender as demandas desse município."
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Gestão integrada",
+  "fornecedor": "A R S DE OLIVEIRA",
+  "valor": 14400.0,
+  "inicio": "2024-01-19",
+  "fim": "2025-01-19",
+  "objeto": "Locação de softwares de gestão pública no módulo de recursos humanos destinado ao atendimento das necessidades da Prefeitura Municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Riacho da Cruz",
+  "categoria": "Diário oficial",
+  "fornecedor": "K D FRANCELINO",
+  "valor": 6000.0,
+  "inicio": "2024-01-25",
+  "fim": "2025-01-25",
+  "objeto": "SOFTWARE DE DIÁRIO OFICIAL ELETRÔNICO, COMPOSTO DE UM SISTEMA GERENCIADOR DE PUBLICAÇÃO."
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "EM DE OLIVEIRA - ME",
+  "valor": 17281.0,
+  "inicio": "2024-02-09",
+  "fim": "2025-02-10",
+  "objeto": "CONTRATAÇÃO DE SOFTWARE DE PONTO ELETRONICO PARA SEC DE EDUCAÇÃO E DE SOFTWARE DE SISTEMA DE GERENCIAMENTO DE INFORMAÇÕES EDUCACIONAIS DESTINADOS A SECRETARIA DE EDUCAÇÃO DESTE MUNICIPIO."
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "WEB COMERCIO E SERVICOS LTDA - ME",
+  "valor": 9000.0,
+  "inicio": "2024-08-14",
+  "fim": "2025-02-14",
+  "objeto": "Contratação de empresa para fornecimento de Licença de Software para gerenciamento de sistema de ponto eletrônico, incluindo migração e treinamento, conforme o Termo de Referência"
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "WEB COMERCIO E SERVICOS LTDA - ME",
+  "valor": 18000.0,
+  "inicio": "2024-08-14",
+  "fim": "2025-02-14",
+  "objeto": "Contratação de empresa para fornecimento de Licença de Software para gerenciamento de sistema de ponto eletrônico, incluindo migração e treinamento, conforme o Termo de Referência"
+ },
+ {
+  "municipio": "Riacho da Cruz",
+  "categoria": "Outro",
+  "fornecedor": "ALVES E VIEIRA SERVIÇOS PARA GESTÃO PÚBLICA LTDA",
+  "valor": 31680.0,
+  "inicio": "2024-02-26",
+  "fim": "2025-02-26",
+  "objeto": "LOCAÇÃO DE SOFTWARES PARA ATENDIMENTO DAS NECESSIDADES DA SECRETARIA"
+ },
+ {
+  "municipio": "Encanto",
+  "categoria": "Gestão integrada",
+  "fornecedor": "RONALDO COSME BEZERRA LTDA",
+  "valor": 15000.0,
+  "inicio": "2024-02-27",
+  "fim": "2025-02-27",
+  "objeto": "Locação de sistema, contendo: Sistema de administração tributaria, nota fiscal de serviços eletronica e Atendimento Tributario ao cidadão via internet, com apoio técnico especializado para a Sec. Mun. de Tributação de Encanto - RN"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Gestão escolar",
+  "fornecedor": "CENTRO DE FORMACAO E CAPACITACAO DE PROFISSIONAIS ",
+  "valor": 33868.1,
+  "inicio": "2024-11-07",
+  "fim": "2025-03-07",
+  "objeto": "1.1.\tContratação de empresa para aquisição do Projeto Rever, Sistema Integrado complementar de ensino com finalidade a promoção e acompanhamento da recomposição das aprendizagens em língua portuguesa e matemática para estudantes de 1º ao 9º do ensino fundamental, professores e equipe gestora, com ac"
+ },
+ {
+  "municipio": "Encanto",
+  "categoria": "Site",
+  "fornecedor": "A AMARO F DA SILVA - ME",
+  "valor": 15000.0,
+  "inicio": "2024-03-15",
+  "fim": "2025-03-15",
+  "objeto": "Contratação de serviços de Locação de software de gerenciamento e controle do site Oficial da Prefeitura, para atender a LEI Nº 12.527/2011 - Lei de acesso à Informação da Prefeitura Municipal do Encanto/RN., conforme termo de referência que compõe o presente processo conforme condições, quantidades"
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Site",
+  "fornecedor": "COM4 DATA CENTER LTDA",
+  "valor": 2398.8,
+  "inicio": "2024-04-30",
+  "fim": "2025-04-30",
+  "objeto": "Prestação de serviços na hospedagem do site: www.vicosa.rn.gov.br pelo período de 12 (doze) meses."
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SIG SOFTWARE & CONSULTORIA EM TECNOLOGIA DA INFORM",
+  "valor": 20124.0,
+  "inicio": "2024-05-08",
+  "fim": "2025-05-08",
+  "objeto": "Contratação de empresa especializada na prestação de serviços continuados de sustentação, manutenção, suporte técnico e hospedagem do Sistema Integrado de Gestão da Educação – SIGEDUC, solução desenvolvida pelo governo do Estado do Rio Grande do Norte e implantada no município de Portalegre/RN"
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Site",
+  "fornecedor": "40.412.081 GLEDSON RAFAEL COSTA NASCIMENTO",
+  "valor": 6504.0,
+  "inicio": "2025-02-24",
+  "fim": "2025-08-24",
+  "objeto": "Contratação de empresa especializada para prestação de serviços de manutenção e atualização de informações do site oficial da Prefeitura Municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "WhatsApp",
+  "fornecedor": "K D FRANCELINO",
+  "valor": 11400.0,
+  "inicio": "2024-08-30",
+  "fim": "2025-08-30",
+  "objeto": "CONTRATAÇÃO DE PESSOA JURIDICA PARA PRESTAÇÃO DE SERVIÇOS DE LOCAÇÃO E LICENÇA DE USO DE SOFTWARE DE GERENCIADOR DE PLATAFORMA DE MENSAGENS DE ATENDIMENTO VIA WHATSAPP DESTINADO A PREFEITURA MUNICIPAL DE SERRINHA DOS PINTOS/RN."
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Site",
+  "fornecedor": "ASSESI BRASIL LTDA",
+  "valor": 58000.0,
+  "inicio": "2024-10-10",
+  "fim": "2025-10-10",
+  "objeto": "Contratação de serviços de locação de softwares de gerenciamento e controle do site Oficial da Prefeitura e gerenciamento de e-mails institucionais, para atender a Lei Nº 12.527/2011 - Lei de acesso à Informação e Decreto Municipal 035/2019, junto a Secretaria Municipal de Administração"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Site",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADO AO SETOR PUBLICO LTDA",
+  "valor": 36800.0,
+  "inicio": "2024-10-18",
+  "fim": "2025-10-18",
+  "objeto": "Contratação de serviços de locação de software de gerenciamento e controle do site Oficial da Prefeitura, para atender a LEI Nº 12.527/2011 - Lei de acesso à Informação; Servidor de E-mails (10 caixas); Software Gerenciamento e elaboração do fluxo de contratações, incluindo ferramenta de busca de pr"
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Outro",
+  "fornecedor": "NOPAPER SOLUTIONS LTDA",
+  "valor": 14000.0,
+  "inicio": "2024-12-05",
+  "fim": "2025-12-05",
+  "objeto": "Contratação de serviços especializados de locação software na modalidade Software as a Service (SaaS), incluindo a instalação, configuração, hospedagem em nuvem e manutenção contínua da solução tecnológica à prefeitura municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Olho d'Água do Borges",
+  "categoria": "Compras e preços",
+  "fornecedor": "CESTA DE PRECOS - SOLUCOES TECNOLOGICAS E CAPACITACOES LTDA",
+  "valor": 24000.0,
+  "inicio": "2025-01-28",
+  "fim": "2025-12-31",
+  "objeto": "CONTRATAÇÃO DE EMPRESA DO RAMO DE TECNOLOGIA DA INFORMAÇÃO PARA PRESTAÇÃO DE SERVIÇOS DE CESSÃO DE USO DE SOFTWARE PARA AUXÍLIO NA FORMAÇÃO E ELABORAÇÃO DE PESQUISAS DE PREÇOS DAS COMPRAS PUBLICAS E PARA ELABORAÇÃO DE DFD, ETP, TR, PCA E DEMAIS ARTEFATOS."
+ },
+ {
+  "municipio": "Rafael Godeiro",
+  "categoria": "Gestão integrada",
+  "fornecedor": "LOPESOFT TECNOLOGIA LTDA",
+  "valor": 36000.0,
+  "inicio": "2025-01-16",
+  "fim": "2025-12-31",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA NO FORNECIMENTO DE SOFTWARES INTEGRADOS DE: RECURSOS HUMANOS; FISCALIZAÇÃO E ARRECADAÇÃO NA WEB E ATENDIMENTO AO CIDADÃO E O SOFTWARE DE GESTÃO DE4 ISSQN E NFSe"
+ },
+ {
+  "municipio": "Taboleiro Grande",
+  "categoria": "Compras e preços",
+  "fornecedor": "AC2B TECNOLOGIA LTDA",
+  "valor": 48000.0,
+  "inicio": "2025-04-02",
+  "fim": "2025-12-31",
+  "objeto": "Locação de Plataforma web de gestão de compras, geração do processo administrativo automatizado, elaboração dos Estudos Técnicos Preliminares – ETP, gestão de riscos, contratos integrados com plataforma para realização das dispensas, credenciamento e pregão eletrônicos e PNCP"
+ },
+ {
+  "municipio": "São Francisco do Oeste",
+  "categoria": "Frota",
+  "fornecedor": "REDE DE SAUDE CLINICA DA FAMILIA LTDA",
+  "valor": 4674.51,
+  "inicio": "2025-10-28",
+  "fim": "2026-01-28",
+  "objeto": "Contratação de empresa especializada para o fornecimento, implantação, operação e suporte técnico de um sistema informatizado e integrado de gerenciamento da frota municipal da Prefeitura de São Francisco do Oeste/RN"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Site",
+  "fornecedor": "A R S DE OLIVEIRA",
+  "valor": 42000.0,
+  "inicio": "2025-01-28",
+  "fim": "2026-01-28",
+  "objeto": "Contratação de empresa ou profissional especializado na prestação de serviços em de atualização de website institucional em \" www.serrinhadospintos.rn.gov.br\", com atualização e inclusão de informações do portal da transparência atendendo assim as necessidades da Prefeitura Municipal de Serrinha dos"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Diário oficial",
+  "fornecedor": "A R S DE OLIVEIRA",
+  "valor": 9000.0,
+  "inicio": "2025-01-28",
+  "fim": "2026-01-28",
+  "objeto": "Contratação de empresa especializada para a disponibilização de licença de uso de software de Diário Oficial Eletrônico, compreendendo um sistema gerenciador de publicação"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "EM DE OLIVEIRA - ME",
+  "valor": 20718.0,
+  "inicio": "2025-04-28",
+  "fim": "2026-01-28",
+  "objeto": "Contratação de software de ponto eletrônico e de sistema de gerenciamento de informações educacionais, destinados à Secretaria Municipal de Educação"
+ },
+ {
+  "municipio": "Martins",
+  "categoria": "Compras e preços",
+  "fornecedor": "CESTA DE PRECOS - SOLUCOES TECNOLOGICAS E CAPACITACOES LTDA",
+  "valor": 8000.0,
+  "inicio": "2025-02-04",
+  "fim": "2026-02-04",
+  "objeto": "Contratação de empresa do ramo de tecnologia, para locação de uso de software de pesquisa e comparação de preços, objetivando o auxílio na formação e elaboração de pesquisas de preços nos processos licitatórios realizados pela Prefeitura Municipal de MARTINS/RN."
+ },
+ {
+  "municipio": "São Francisco do Oeste",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADO AO SETOR PÚBLICO LTDA - ME",
+  "valor": 18600.0,
+  "inicio": "2025-02-06",
+  "fim": "2026-02-06",
+  "objeto": "Contratação de empresa especializada para prestação de serviço e implantação de solução de gestão escolar, incluindo: implantação do software público i-Educar, implantação de ferramentas administrativas integradas, portais de professor e serviços à comunidade escolar e gerenciamento inteligente. Inc"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Compras e preços",
+  "fornecedor": "ALVES E VIEIRA SERVIÇOS PARA GESTÃO PUBLICA LTDA",
+  "valor": 24000.0,
+  "inicio": "2025-02-07",
+  "fim": "2026-02-06",
+  "objeto": "Contratação de locação de software visando a elaboração de plano contratação anual, ETP e Termo de Referência visando o auxílio nos processos Licitatórios a serem realizados por esta Administração"
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "OTIMIZE SOLUCOES LTDA",
+  "valor": 1800.0,
+  "inicio": "2025-03-26",
+  "fim": "2026-03-26",
+  "objeto": "Contratação de licença de software integrado para controle e gestão da frequência dos servidores públicos da Prefeitura Municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Martins",
+  "categoria": "Frota",
+  "fornecedor": "DUNAS ASSESSORIA E CONSULTORIA LTDA",
+  "valor": 54000.0,
+  "inicio": "2025-04-04",
+  "fim": "2026-04-03",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA PARA PRESTAÇÃO DE SERVIÇOS TÉCNICOS DE ASSESSORIA E CONSULTORIA EM GESTÃO DE FROTA MUNICIPAL, INCLUINDO A IMPLANTAÇÃO, MANUTENÇÃO E GERENCIAMENTO DE SOFTWARES DE CONTROLE DE ABASTECIMENTO, MANUTENÇÃO E CUSTOS DA FROTA, visando a redução de desperdícios, otimizaçã"
+ },
+ {
+  "municipio": "Alexandria",
+  "categoria": "Outro",
+  "fornecedor": "ALVARO LUIZ MORAIS DE OLIVEIRA79893317487",
+  "valor": 4650.0,
+  "inicio": "2025-04-14",
+  "fim": "2026-04-14",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA NA PRESTAÇÃO DE SERVIÇO DE ALOCAÇÃO, MANUTENÇÃO, COM SUPORTE PREVENTIVO E CORRETIVO EM SISTEMA DE GESTÃO DE LABORATÓRIO"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Outro",
+  "fornecedor": "Maria Rozilania Feitosa da Silva",
+  "valor": 10800.0,
+  "inicio": "2025-04-15",
+  "fim": "2026-04-15",
+  "objeto": "Contratação de empresa especializada para a prestação de serviços técnicos de apoio à gestão de sistemas de informação em saúde, incluindo atualização, organização, digitação, processamento e manutenção dos sistemas CNES, BPA, SIA, FPO, SISAIH01 e SIHD, bem como participação em treinamentos e reuniõ"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Gestão integrada",
+  "fornecedor": "A.O.S. SOFTWARE LTDA",
+  "valor": 27000.0,
+  "inicio": "2025-10-17",
+  "fim": "2026-04-17",
+  "objeto": "Contratação de pessoa jurídica especializada para a cessão de direito de uso de sistemas de informática integrados para gestão pública municipal, contemplando os módulos de Recursos Humanos e Folha de Pagamento, Contabilidade Pública, Licitações e Contratos, Administração Tributária e Arrecadação, P"
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SIG Software & Consultoria em Tecnologia da Inform",
+  "valor": 18000.0,
+  "inicio": "2025-05-06",
+  "fim": "2026-05-06",
+  "objeto": "prestação de serviços continuados de instalação, treinamento, sustentação, manutenção, suporte técnico e hospedagem do Sistema Integrado de Gestão de Educação – SIGEduc, solução desenvolvida pelo o Governo do Estado do Rio Grande do Norte e cedida gratuitamente ao município de Marcelino Vieira-RN, o"
+ },
+ {
+  "municipio": "Olho d'Água do Borges",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SISAEDUC SISTEMAS LTDA",
+  "valor": 15600.0,
+  "inicio": "2025-05-22",
+  "fim": "2026-05-22",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA PARA CESSÃO DE DIREITO DE USO DE SISTEMA DE GESTÃO ESCOLAR NO ÂMBITO DAS UNIDADES DE ENSINO DO MUNICÍPIO DE OLHO D´ÁGUA DO BORGES/RN"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SIG SOFTWARE & CONSULTORIA EM TECNOLOGIA DA INFORM",
+  "valor": 21600.0,
+  "inicio": "2025-05-23",
+  "fim": "2026-05-23",
+  "objeto": "Contratação de empresa especializada na prestação de serviços continuados de sustentação, manutenção, suporte técnico e hospedagem do Sistema Integrado de Gestão da Educação – SIGEDUC, solução desenvolvida pelo governo do Estado do Rio Grande do Norte e implan-tada no município de Portalegre/RN"
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Gestão integrada",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADO AO SETOR PUBLICO LTDA",
+  "valor": 48000.0,
+  "inicio": "2025-06-02",
+  "fim": "2026-06-02",
+  "objeto": "Contratação de empresa especializada para a locação de solução integrada de software de gestão pública, em ambiente web, com suporte técnico, capacitação de usuários, manutenção evolutiva e corretiva, visando atender às necessidades administrativas da Prefeitura Municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Martins",
+  "categoria": "Gestão integrada",
+  "fornecedor": "K D FRANCELINO",
+  "valor": 118000.0,
+  "inicio": "2025-06-03",
+  "fim": "2026-06-03",
+  "objeto": "Contratação de empresa especializada para a prestação de serviços de licenciamento de uso, implantação, manutenção, suporte técnico e atualização de sistema de gestão pública integrado, em diversos módulos, para atender às necessidades da Prefeitura Municipal de Martins/RN."
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Site",
+  "fornecedor": "J LUIZ DE ANDRADE SANTOS",
+  "valor": 49200.0,
+  "inicio": "2025-06-05",
+  "fim": "2026-06-05",
+  "objeto": "Contratação de empresa especializada na prestação de serviços de marketing digital, design, filmagem, gestão de redes sociais, criação, desenvolvimento e edição de artes gráficas e atualização do web site do município com cobertura dos eventos municipais para divulgação"
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "PONTOTECH COMERCIO E DESENVOLVIMENTO DE SOFTWARE LTDA",
+  "valor": 7140.0,
+  "inicio": "2025-07-07",
+  "fim": "2026-07-07",
+  "objeto": "Contratação de licença de software integrado para controle e gestão da frequência dos servidores públicos da Prefeitura Municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Antônio Martins",
+  "categoria": "Outro",
+  "fornecedor": "LAY OUT SERVICOS DE INFORMATICA E PROCESSAMENTO DE DADOS LTDA",
+  "valor": 7800.0,
+  "inicio": "2025-07-11",
+  "fim": "2026-07-10",
+  "objeto": "LICENÇA DE USO DE SISTEMA INFORMATIZADO INTE PAGAMENTO, JUNTO A PREFEITURA MUNICIPAL DE ANTÔNIO MARTINS-RN"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Protocolo e documentos",
+  "fornecedor": "CONSORCIO PUBLICO INTERMUNICIPAL DE DESENVOLVIMENT",
+  "valor": 43200.0,
+  "inicio": "2025-07-29",
+  "fim": "2026-07-29",
+  "objeto": "Contratação do sistema de gestão documental e de processos eletrônicos “1Doc”, solução tecnológica amplamente utilizada por entes federativos para a modernização da gestão pública, digitalização de fluxos internos e atendimento eletrônico ao cidadão, decorrente de adesão à Ata de Registro de Preços "
+ },
+ {
+  "municipio": "José da Penha",
+  "categoria": "Outro",
+  "fornecedor": "3F LTDA",
+  "valor": 2997.0,
+  "inicio": "2025-08-08",
+  "fim": "2026-08-08",
+  "objeto": "Locação de Software de orçamento de obras nos módulos Orçamento, Bases Adicionais e Medição de Obras."
+ },
+ {
+  "municipio": "José da Penha",
+  "categoria": "Outro",
+  "fornecedor": "AUDATEX BRASIL SERVICOS LTDA",
+  "valor": 7068.0,
+  "inicio": "2025-08-21",
+  "fim": "2026-08-21",
+  "objeto": "Prestação de serviços de 01 (uma) licença de uso de software de orçamentação eletrônica, destinada a reparação automotiva, com assinatura anual de acesso ao banco de dados do Sistema AudatexGov."
+ },
+ {
+  "municipio": "Martins",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SISAEDUC SISTEMAS LTDA",
+  "valor": 14016.0,
+  "inicio": "2025-08-25",
+  "fim": "2026-08-25",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA NO FORNECIMENTO DE SISTEMA DE GESTÃO DA EDUCAÇÃO EM NUVEM, MEDIANTE LICENÇA ANUAL DE USO, COMPREENDENDO FERRAMENTAS DE GESTÃO ESCOLAR, CURSOS, ANOS LETIVOS, TURMAS, DIÁRIOS DE CLASSE, MATRÍCULAS, COM ACESSO PARA PROFESSORES, DIRETORES, SECRETÁRIOS, COORDENADORES "
+ },
+ {
+  "municipio": "Viçosa",
+  "categoria": "Site",
+  "fornecedor": "40.412.081 GLEDSON RAFAEL COSTA NASCIMENTO",
+  "valor": 12000.0,
+  "inicio": "2025-10-07",
+  "fim": "2026-10-07",
+  "objeto": "Contratação de empresa especializada para prestação de serviços de manutenção e atualização de informações do site oficial da Prefeitura Municipal de Viçosa/RN"
+ },
+ {
+  "municipio": "Taboleiro Grande",
+  "categoria": "Gestão escolar",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADOS AO SETOR PÚBLICO LTDA ME",
+  "valor": 80640.0,
+  "inicio": "2026-05-08",
+  "fim": "2026-10-08",
+  "objeto": "Locação de Sistema Integrado de Administração Financeira, compreendendo os módulos de Contabilidade Pública e Transparência, Licitação, Compras e Contratos, Patrimônio, Almoxarifado, Gestão de Recursos Humanos, Gestão Educacional, Gestão de Conteúdo Web, Gestão de Protocolo Geral e Gestão de Tributo"
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Gestão integrada",
+  "fornecedor": "S S INFORMATICA ASSESSORIA E CONSULTORIA MUNICIPAL LTDA",
+  "valor": 47100.0,
+  "inicio": "2025-10-28",
+  "fim": "2026-10-28",
+  "objeto": "contratação de Empresa para Locação de Software em Forma de Licença de Uso com suporte técnico integrado para administração e gerenciamento do setor licitação, compras, contabilidade, tributação, portal de transparência e folha de pagamento do município de Marcelino Vieira-RN"
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Gestão integrada",
+  "fornecedor": "A.O.S SOFTWARE LTDA",
+  "valor": 80400.0,
+  "inicio": "2025-11-18",
+  "fim": "2026-11-18",
+  "objeto": "contratação de Empresa para Locação de Software em Forma de Licença de Uso com suporte técnico integrado para administração e gerenciamento do setor licitação, compras, contabilidade, tributação, portal de transparência e folha de pagamento do município de Marcelino Vieira-RN"
+ },
+ {
+  "municipio": "Alexandria",
+  "categoria": "Compras e preços",
+  "fornecedor": "E–SOFT TECNOLOGIA EM INFORMATICA LTDA",
+  "valor": 14400.0,
+  "inicio": "2025-12-01",
+  "fim": "2026-12-01",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA PARA LOCAÇÃO DE SOFTWARE DE CONTROLE DE LICITAÇÃO, EM CONFORMIDADE COM A LEGISLAÇÃO VIGENTE, ASSIM COM AS EXIGÊNCIAS DO TRIBUNAL DE CONTAS DO ESTADO DO RIO GRANDE DO NORTE. O SOFTWARE DEVERÁ POSSIBILITAR A EMISSÃO DE TODOS OS DOCUMENTOS E ELEMENTOS PREVISTOS NA L"
+ },
+ {
+  "municipio": "Marcelino Vieira",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "PONTOTECH COMERCIO E DESENVOLVIMENTO DE SOFTWARE LTDA",
+  "valor": 4798.0,
+  "inicio": "2025-12-05",
+  "fim": "2026-12-05",
+  "objeto": "Contratação de empresa para fornecimento de Licença de Software para gerenciamento de sistema de ponto eletrônico, incluindo migração e treinamento"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Outro",
+  "fornecedor": "ALVARO LUIZ MORAIS DE OLIVEIRA",
+  "valor": 3960.0,
+  "inicio": "2025-12-11",
+  "fim": "2026-12-11",
+  "objeto": "contratação de empresa do ramo de sistemas da informação para locação de software em nuvem destinado ao gerenciamento de exames laboratoriais, impressão de laudos e emissão de relatórios, incluindo funcionalidades como armazenamento seguro de dados, acesso multiusuário, integração com unidades de sa"
+ },
+ {
+  "municipio": "Almino Afonso",
+  "categoria": "Gestão integrada",
+  "fornecedor": "X - SOLUTION DOC BUREAU LTDA",
+  "valor": 241000.0,
+  "inicio": "2025-01-13",
+  "fim": "2027-01-13",
+  "objeto": "Registro de preço para contratação de uma empresa especializada para fornecimento de plataforma de gestão pública web de virtualização de processo administrativo deste município"
+ },
+ {
+  "municipio": "Martins",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "A R S DE OLIVEIRA",
+  "valor": 18300.0,
+  "inicio": "2026-01-16",
+  "fim": "2027-01-15",
+  "objeto": "Contratação de empresa especializada para a locação de software de controle de frequência (ponto eletrônico), com tecnologia de validação biométrica facial e geolocalização, destinado ao registro, gerenciamento e acompanhamento da jornada de trabalho dos servidores, conforme especificações técnicas,"
+ },
+ {
+  "municipio": "Olho d'Água do Borges",
+  "categoria": "Outro",
+  "fornecedor": "E. C. T. DA SILVA ASSESSORIA E CONSULTORIA EM SAUDE LTDA",
+  "valor": 54648.0,
+  "inicio": "2026-01-21",
+  "fim": "2027-01-20",
+  "objeto": "CONTRATAÇÃO DE PESSOA JURÍDICA PARA A PRESTAÇÃO DE SERVIÇOS DE APOIO A PROGRAMAS, PROJETOS E DOS SISTEMAS DE INFORMAÇÃO DA SECRETARIA MUNICIPAL DE SAÚDE E SANEAMENTO DO MUNICÍPIO DE OLHO D´ÁGUA DO BORGES/RN"
+ },
+ {
+  "municipio": "São Francisco do Oeste",
+  "categoria": "Frota",
+  "fornecedor": "REDE DE SAUDE CLINICA DA FAMILIA LTDA",
+  "valor": 21072.0,
+  "inicio": "2026-02-09",
+  "fim": "2027-02-09",
+  "objeto": "Contratação de empresa especializada para fornecimento, implantação, operação e suporte técnico de um sistema informatizado e integrado de gerenciamento da frota de veículos municipais da Prefeitura de São Francisco do Oeste/RN"
+ },
+ {
+  "municipio": "Taboleiro Grande",
+  "categoria": "Compras e preços",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADOS AO SETOR PÚBLICO LTDA ME",
+  "valor": 12000.0,
+  "inicio": "2026-02-23",
+  "fim": "2027-02-23",
+  "objeto": "Contratação de empresa para locação de sistema de busca de preços com integração ao Portal Nacional de Contratação Pública - PNCP"
+ },
+ {
+  "municipio": "São Francisco do Oeste",
+  "categoria": "Compras e preços",
+  "fornecedor": "SISTEMAS INTEGRADOS APLICADO AO SETOR PÚBLICO LTDA - ME",
+  "valor": 24000.0,
+  "inicio": "2026-02-25",
+  "fim": "2027-02-25",
+  "objeto": "Contratação de empresa especializada em serviços de locação de sistema de gerenciamento e elaboração do fluxo de contratações, incluindo ferramenta de busca de preços com integração ao PNCP e envio de PCA"
+ },
+ {
+  "municipio": "Martins",
+  "categoria": "Site",
+  "fornecedor": "50.653.069 RICARDO DE CARVALHO ANATOLIO",
+  "valor": 24000.0,
+  "inicio": "2026-03-03",
+  "fim": "2027-03-02",
+  "objeto": "CONTRATAÇÃO DE EMPRESA OU PROFISSIONAL ESPECIALIZADO NA PRESTAÇÃO DE SERVIÇOS EM ATUALIZAÇÃO DE WEBSITE INSTITUCIONAL EM WWW.MARTINS.RN.GOV.BR, COM ATUALIZAÇÃO E MANUTENÇÃO PREVENTIVA E CORRETIVA E EVOLUTIVA DO PORTAL DA TRANSPARÊNCIA EM ATENDIMENTO A LEI 12.527 DE NOVEMBRO DE 2011 E SUAS ALTERAÇÕES"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "EM DE OLIVEIRA - ME",
+  "valor": 26090.0,
+  "inicio": "2026-06-05",
+  "fim": "2027-04-05",
+  "objeto": "Contratação de software de ponto eletrônico e de sistema de gerenciamento de informações educacionais, destinados à Secretaria Municipal de Educação"
+ },
+ {
+  "municipio": "Olho d'Água do Borges",
+  "categoria": "Protocolo e documentos",
+  "fornecedor": "GTH SOLUCAO E TECNOLOGIA LTDA",
+  "valor": 54495.0,
+  "inicio": "2026-05-20",
+  "fim": "2027-05-20",
+  "objeto": "1.0.\tCONTRATAÇÃO DE EMPRESA PARA PRESTAÇÃO DOS SERVIÇOS DE GESTÃO ESTRATÉGICA ARQUIVISTAS DE PROCESSOS ADMINISTRATIVOS, EM FORMA DE . LICENÇA DE USO DE SOFTWARE WEB PARA TRAMITAÇÃO ELETRÔNICA DE PROCESSOS E ASSINATURA DIGITAL DE DOCUMENTOS, EM ARQUIVO PDF E O ARMAZENAMENTOS DOS MESMOS, EM MÁQUINA VI"
+ },
+ {
+  "municipio": "Serrinha dos Pintos",
+  "categoria": "Frota",
+  "fornecedor": "REDE DE SAUDE CLINICA DA FAMILIA LTDA",
+  "valor": 24000.0,
+  "inicio": "2026-07-24",
+  "fim": "2027-07-23",
+  "objeto": "Contratação de empresa especializada para a prestação de serviços continuados de gestão integrada da frota de veículos do Município, por meio de sistema informatizado, contemplando o controle de abastecimento, controle de lavagem, gerenciamento dos serviços de manutenção preventiva e corretiva em of"
+ },
+ {
+  "municipio": "Riacho da Cruz",
+  "categoria": "Ponto eletrônico",
+  "fornecedor": "58.442.413 ISAIAS MOURA",
+  "valor": 13500.0,
+  "inicio": "2026-08-18",
+  "fim": "2027-08-18",
+  "objeto": "Contratação de empresa para fornecimento de licença de sistema de gerenciamento de ponto eletrônico, com registro de frequência via aplicativo em modo online e offline, geolocalização, armazenamento em nuvem e manutenção dos equipamentos de registro de ponto eletrônico modelo Ponto IDFace Control iD"
+ },
+ {
+  "municipio": "Olho d'Água do Borges",
+  "categoria": "Gestão integrada",
+  "fornecedor": "TINUS INFORMATICA LTDA",
+  "valor": 21600.0,
+  "inicio": "2026-08-27",
+  "fim": "2027-08-26",
+  "objeto": "CONTRATAÇÃO DE EMPRESA ESPECIALIZADA PARA LOCAÇÃO E MANUTENÇÃO, PELO PERÍODO DE 12 (DOZE) MESES, DO SIAT - SISTEMA INTEGRADO DE ADMINISTRAÇÃO TRIBUTÁRIA, COMPOSTO DOS APLICATIVOS ABAIXO RELACIONADOS, NA VERSÃO INTERFACE WEB, INCLUINDO OS MÓDULOS PORTAL DO CONTRIBUINTE VIA INTERNET, DECLARAÇÃO MENSAL"
+ },
+ {
+  "municipio": "São Francisco do Oeste",
+  "categoria": "Outro",
+  "fornecedor": "SENSUS DIGITAL - INFORMACAO EM GESTAO E CONTABILIDADE LTDA",
+  "valor": 3000.0,
+  "inicio": "2025-04-02",
+  "fim": "2027-10-02",
+  "objeto": "Contratação de empresa especializada para a realização do curso de análises contábeis e fiscais estratégicas, via plataforma online para o servidor da prefeitura municipal de São Francisco do Oeste/RN, José Nilciedson da Silva"
+ },
+ {
+  "municipio": "Coronel João Pessoa",
+  "categoria": "Gestão escolar",
+  "fornecedor": "PORTABILIS TECNOLOGIA LTDA",
+  "valor": 33600.0,
+  "inicio": "2026-09-15",
+  "fim": "2028-09-14",
+  "objeto": "contratação de empresa especializada para a cessão de direito de uso de sistema web de gestão escolar, conforme termo de referência"
+ },
+ {
+  "municipio": "Portalegre",
+  "categoria": "Outro",
+  "fornecedor": "682 SOLUCOES EM TECNOLOGIA DA INFORMACAO LTDA",
+  "valor": 7599.6,
+  "inicio": "2025-04-04",
+  "fim": "2029-04-04",
+  "objeto": "AQUISIÇÃO DE LICENÇA DE USO DE SISTEMA PARA ELABORAÇÃO DE ORÇAMENTOS DE OBRAS E SERVIÇOS DE ENGENHARIA, PARA ATENDER AS NECESSIDADES DA SECRETARIA MUNICIPAL DE INFRAESTRUTURA"
+ }
+]
