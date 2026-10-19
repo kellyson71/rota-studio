@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f3ec">
+<title>Termos de Uso · Indexa Tecnologia</title>
+<meta name="description" content="Termos de uso do site da Indexa Tecnologia.">
+<link rel="icon" href="assets/indexa-mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="landing.css">
+</head>
+<body>
+<header class="nav">
+  <a class="logo" href="index.html" aria-label="Indexa Tecnologia, início"><img src="assets/indexa-mark.svg" alt="" width="34" height="34"><span>indexa<small>tecnologia</small></span></a>
+  <nav aria-label="Seções"><a href="index.html">← Voltar ao site</a></nav>
+  <a class="btn btn-wa" data-wa="Olá! Vim pelo site da Indexa." href="index.html#contato"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.7l4.8-1.3A9.8 9.8 0 1 0 12 2.2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8.6 7.3c.3-.5.6-.5.9-.5h.6c.2 0 .4 0 .6.5l.8 1.9c.1.3 0 .5-.1.7l-.6.7c-.1.2-.2.4 0 .6.6 1.1 1.6 2.1 2.8 2.7.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.4.4 0 .5-.1 1.2-.6 1.6-.5.4-1.3.8-2.3.6-1.7-.3-3.6-1.6-4.9-3.1-1.2-1.4-1.9-2.8-1.9-4 0-.8.3-1.4.5-1.8z" fill="currentColor"/></svg><span><span class="hide-sm">Chamar no </span>WhatsApp</span></a>
+</header>
+<main class="legal">
+  <p class="eyebrow">Documento legal</p>
+  <h1>Termos de Uso</h1>
+  <p class="updated">Última atualização: 19 de outubro de 2026</p>
+  <p class="intro">Ao usar este site, você concorda com os termos abaixo. Se não concordar, não use o site.</p>
+
+  <h2>1. Sobre o site</h2>
+  <p>Este site apresenta os serviços da <strong>Indexa Tecnologia</strong>, formada por Kellyson Medeiros e Jeyce, em Pau dos Ferros/RN, e permite que você entre em contato com a gente.</p>
+
+  <h2>2. Informações e valores</h2>
+  <p>Os pacotes e valores mostrados são <strong>referências</strong>. O escopo, o prazo e o preço de cada projeto são definidos em proposta própria, enviada depois da conversa. Nada neste site constitui oferta vinculante ou contrato.</p>
+
+  <h2>3. Projetos do portfólio</h2>
+  <p>Os projetos exibidos foram desenvolvidos pela nossa equipe. Nomes, marcas, brasões e telas pertencem aos respectivos titulares e aparecem apenas para mostrar o nosso trabalho, sem indicar parceria, patrocínio ou endosso deles a este site.</p>
+
+  <h2>4. Uso permitido</h2>
+  <p>Você pode navegar e nos enviar contato. Não é permitido usar o formulário para enviar conteúdo ilegal, ofensivo ou automatizado, nem tentar acessar áreas restritas sem autorização.</p>
+
+  <h2>5. Propriedade intelectual</h2>
+  <p>Textos, marca Indexa, layout e código deste site pertencem à Indexa Tecnologia. Não reproduza sem autorização.</p>
+
+  <h2>6. Links externos</h2>
+  <p>O site tem links para sistemas de clientes e para o WhatsApp. Não somos responsáveis pelo conteúdo e pelas políticas desses serviços.</p>
+
+  <h2>7. Disponibilidade</h2>
+  <p>Trabalhamos para manter o site no ar, mas ele pode ficar indisponível por manutenção ou falhas de fornecedores.</p>
+
+  <h2>8. Privacidade</h2>
+  <p>O tratamento dos seus dados segue a nossa <a href="privacidade.html">Política de Privacidade</a>.</p>
+
+  <h2>9. Lei e foro</h2>
+  <p>Estes termos seguem a lei brasileira. Fica eleito o foro da comarca de Pau dos Ferros/RN, ressalvados os direitos do consumidor de usar o foro do seu domicílio.</p>
+
+  <h2>10. Contato</h2>
+  <p>Dúvidas sobre estes termos: <a data-wa="Olá! Tenho uma dúvida sobre os termos de uso do site." href="index.html#contato">WhatsApp (84) 8108-7357</a>.</p>
+</main>
+<footer class="foot">
+  <a class="logo" href="index.html"><img src="assets/indexa-mark.svg" alt="" width="28" height="28"><span>indexa<small>tecnologia</small></span></a>
+  <p>Pau dos Ferros/RN</p>
+  <nav class="foot-links" aria-label="Documentos"><a href="privacidade.html">Política de Privacidade</a><a href="termos.html">Termos de Uso</a></nav>
+</footer>
+<script src="config.js"></script>
+<script>
+const n = (window.ROTA_CONFIG || {}).whatsapp;
+if (n) document.querySelectorAll("[data-wa]").forEach(a => { a.href = `https://wa.me/${n}?text=${encodeURIComponent(a.dataset.wa)}`; a.target = "_blank"; a.rel = "noopener"; });
+</script>
+</body>
+</html>

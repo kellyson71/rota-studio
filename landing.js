@@ -252,6 +252,7 @@ if (hasGsap && !reduce) {
   $$(".before").forEach(b => b.style.setProperty("--strike", "100%"));
 }
 
+$("#year").textContent = new Date().getFullYear();
 const WA_NUMBER = (window.ROTA_CONFIG || {}).whatsapp;
 if (WA_NUMBER) {
   $$("[data-wa]").forEach(a => {
@@ -283,7 +284,7 @@ $("#contact-form").addEventListener("submit", async e => {
     const res = await fetch(`${cfg.supabaseUrl}/rest/v1/inbound`, {
       method: "POST",
       headers: { apikey: cfg.supabaseKey, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ name: data.name.trim(), phone: data.phone.trim(), kind: data.kind, need: (data.need || "").trim() })
+      body: JSON.stringify({ name: data.name.trim(), phone: data.phone.trim(), kind: data.kind, need: (data.need || "").trim(), consented_at: new Date().toISOString() })
     });
     if (!res.ok) throw new Error(res.status);
     form.reset();

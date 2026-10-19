@@ -36,7 +36,7 @@ jobs:
       - name: Preparar site
         run: |
           mkdir -p dist
-          cp index.html painel.html landing.css landing.js style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
+          cp index.html painel.html privacidade.html termos.html landing.css landing.js style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
           cp -R kit dist/kit
           cp -R assets dist/assets
       - name: Configurar Pages

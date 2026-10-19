@@ -256,7 +256,24 @@ legend { margin-bottom: 8px; padding: 0; }
 
 .foot { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 28px var(--pad) 36px; border-top: 1.5px solid var(--ink); }
 .foot p { margin: 0; color: var(--muted); font-size: 14px; }
-.foot-login { margin-left: auto; font-size: 14px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.foot-links { margin-left: auto; display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; }
+.foot-links a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.foot-links a:hover { color: var(--ink); }
+.foot .copy { flex-basis: 100%; font-size: 13px; }
+.consent { display: flex !important; align-items: flex-start; gap: 10px; text-transform: none !important; letter-spacing: 0 !important; font-weight: 500 !important; font-size: 14px !important; line-height: 1.5; cursor: pointer; }
+.consent input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--ink); flex-shrink: 0; }
+.consent a { text-decoration: underline; text-underline-offset: 2px; color: var(--ink); }
+.legal { max-width: 760px; margin: 0 auto; padding: clamp(40px, 7vw, 90px) var(--pad) 100px; }
+.legal h1 { font-size: clamp(40px, 6vw, 68px); }
+.legal .updated { color: var(--muted); font-size: 14px; margin: 14px 0 34px; }
+.legal .intro { font-size: 19px; color: var(--ink-2); }
+.legal h2 { font-size: clamp(22px, 2.4vw, 28px); letter-spacing: -.02em; margin: 44px 0 12px; scroll-margin-top: 90px; }
+.legal p, .legal li { color: var(--ink-2); }
+.legal ul { padding-left: 20px; display: grid; gap: 6px; }
+.legal a:not(.btn) { text-decoration: underline; text-underline-offset: 3px; color: var(--ink); }
+.toc-legal { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px; }
+.toc-legal a { font-size: 13px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--paper); text-decoration: none !important; }
+.toc-legal a:hover { border-color: var(--ink); }
 
 @keyframes ring { from { transform: scale(1); opacity: .8; } to { transform: scale(1.35); opacity: 0; } }
 @keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -314,7 +331,7 @@ legend { margin-bottom: 8px; padding: 0; }
   .toc-body { padding: 4px var(--pad) 28px; }
   .service-grid, .steps { grid-template-columns: minmax(0, 1fr); }
   .contact-form { grid-template-columns: minmax(0, 1fr); }
-  .foot-login { margin-left: 0; }
+  .foot-links { margin-left: 0; }
   .gallery { padding-bottom: 80px; }
 }
 

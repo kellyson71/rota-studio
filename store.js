@@ -130,6 +130,7 @@
           person: lead.name.split(" ")[0],
           source: "Formulário do site",
           respondedAt: lead.created_at,
+          consentedAt: lead.consented_at || "",
           history: [{ text: "Pediu contato pelo site", type: "reply", actor: lead.name, at: lead.created_at }]
         };
         upsertLocal(Store.contacts, contact);

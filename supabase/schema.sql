@@ -130,3 +130,6 @@ begin
     alter publication supabase_realtime add table public.inbound;
   end if;
 end $$;
+
+alter table public.inbound add column if not exists consented_at timestamptz;
+grant insert (consented_at) on public.inbound to anon, authenticated;
