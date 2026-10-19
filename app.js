@@ -36,24 +36,23 @@ const STAGES = [
   { id: "fechado", label: "Fechados", icon: "✓", match: c => c.status === "Fechado", drop: "Fechado" },
   { id: "parado", label: "Parados", icon: "−", match: c => ["Sem interesse", "Mais tarde"].includes(c.status), drop: "Mais tarde" }
 ];
-const QUALIFICATION = { "COMPENSA": ["vale a pena", "🔥", "hot"], "NAO COMPENSA": ["não compensa", "🙃", "cold"], "bleh, ate que vai": ["bleh, até que vai", "😐", "meh"] };
+const QUALIFICATION = { "COMPENSA": ["vale a pena", "", "hot"], "NAO COMPENSA": ["não compensa", "", "cold"], "bleh, ate que vai": ["bleh, até que vai", "", "meh"] };
 const PRIORITY_RANK = { Urgente: 0, Alta: 1, Normal: 2, Baixa: 3 };
 const QUAL_RANK = { "COMPENSA": 0, "": 1, "bleh, ate que vai": 1, "NAO COMPENSA": 3 };
 
 const JOKES = {
-  sent: ["Mandado! Agora é fingir que não tá olhando o “visto por último” 👀", "Foi! Mensagem no ar ✈️", "Enviado. O universo (e o WhatsApp) agradecem.", "Mais uma porta batida 🚪", "Pronto. Agora é com o algoritmo divino 🙏"],
-  streak: ["5 seguidas! Tá voando 🚀", "Isso é prospecção ou maratona? 🏃", "Modo máquina ativado 🤖"],
-  closed: ["FECHOU! Pix na conta em breve 💸", "Contrato na mão. Pode comemorar (e depois entregar) 🎉", "É TETRA! Quer dizer… é cliente! 🏆"],
-  lost: ["Um não hoje, um case amanhã.", "Next! 🫡", "Tudo bem, a gente tem mais 80 portas."],
-  skip: ["Pulado. Volta no fim da fila.", "Esse fica pra depois 🫥"],
-  done: ["Fila zerada. Vai tomar um café ☕", "Acabou! Até o WhatsApp tá cansado.", "Nenhuma mensagem pendente. Isso é raro, tira um print."],
-  ticker: ["o vácuo não é um não", "follow-up educado > textão desesperado", "cliente bom é cliente que responde", "prospecção é 90% coragem e 10% Ctrl+V", "três “oi, sumido” não viram estratégia", "quem não é visto não é contratado", "o império começa com um follow-up", "orçamento sem prazo é só um sonho"]
+  sent: ["Mandado. Agora é fingir que não está olhando o “visto por último”.", "Foi. Uma porta a menos pra bater.", "Mensagem no ar. Próximo!", "Pronto. O resto é com o cliente."],
+  streak: ["Cinco seguidas. Ritmo bom.", "Isso já é maratona.", "Sequência boa, segue assim."],
+  closed: ["Fechou! Agora é entregar bem.", "Contrato na mão. Pode comemorar.", "Cliente novo na casa."],
+  lost: ["Um não hoje, um case amanhã.", "Sem problema, tem mais porta.", "Anotado. Próximo."],
+  skip: ["Pulado. Volta no fim da fila.", "Esse fica pra depois."],
+  done: ["Fila zerada.", "Acabou a fila. Até o WhatsApp descansou.", "Nenhuma mensagem pendente por aqui."]
 };
 
 const TEMPLATES = [
   { id: "message", label: "1º contato", stored: true },
   { id: "followupMessage", label: "Retorno", stored: true },
-  { id: "meet", label: "Marcar conversa", text: "{oi}! Que bom que respondeu 🙂 Consigo te mostrar em 10 minutos, por vídeo ou aí pessoalmente. Qual dia e horário ficam melhor essa semana?" },
+  { id: "meet", label: "Marcar conversa", text: "{oi}! Que bom que respondeu Consigo te mostrar em 10 minutos, por vídeo ou aí pessoalmente. Qual dia e horário ficam melhor essa semana?" },
   { id: "after", label: "Pós-conversa", text: "{oi}! Obrigado pela conversa. Como combinamos, vou montar a proposta e te mando até {prazo}. Qualquer dúvida, é só chamar aqui. {eu}" },
   { id: "proposal", label: "Proposta", text: "{oi}! Segue a proposta que conversamos: {preco}. Inclui a implantação, os ajustes iniciais e o suporte. Se fizer sentido, a gente já combina o início. Ficou alguma dúvida?" },
   { id: "nudge", label: "Cutucar proposta", text: "{oi}! Conseguiu dar uma olhada na proposta? Se quiser, ajusto o escopo para caber melhor no momento de vocês." }
@@ -77,6 +76,30 @@ const ui = {
   drawerTemplate: "message",
   drawerDraft: null
 };
+
+const DEFAULT_SETTINGS = { weeklyGoal: { Kellyson: 8, Jeyce: 8 }, returnDays: 3, followupDays: 5 };
+const settings = () => ({ ...DEFAULT_SETTINGS, ...Store.settings, weeklyGoal: { ...DEFAULT_SETTINGS.weeklyGoal, ...(Store.settings?.weeklyGoal || {}) } });
+const goalOf = who => Number(settings().weeklyGoal[who] ?? 8);
+
+function weekStart() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+}
+
+function sentThisWeek(who) {
+  const ws = weekStart();
+  return Store.contacts.reduce((n, c) => n + (c.history || []).filter(h => h.type === "sent" && new Date(h.at) >= ws && (!who || h.actor === who)).length, 0);
+}
+
+function claim(c) {
+  if (!c || c.owner) return false;
+  c.owner = actor();
+  log(c, "Pegou o contato ao copiar a mensagem", "owner");
+  Store.saveContact(c, { silent: route() === "turbo" });
+  return true;
+}
 
 function actor() {
   if (Store.mode === "cloud") return Store.member?.name || Store.user?.email || "Alguém";
@@ -136,7 +159,7 @@ function markSent(c, mode = "message", { quiet = false } = {}) {
   c.status = "Aguardando resposta";
   c.sentAt = now();
   c.owner = c.owner || actor();
-  c.returnAt = addDays(followup ? 5 : 3);
+  c.returnAt = addDays(followup ? settings().followupDays : settings().returnDays);
   if (followup) c.followups = (c.followups || 0) + 1;
   log(c, followup ? "Mandou um retorno" : "Mandou a primeira mensagem", "sent");
   Store.saveContact(c);
@@ -151,7 +174,7 @@ function logReply(c, text) {
   c.returnAt = "";
   log(c, text ? `Resposta: “${text}”` : "Respondeu", "reply");
   Store.saveContact(c);
-  toast("Resposta registrada. A bola tá com vocês ⚽", () => restore(c, snap));
+  toast("Resposta registrada. A bola tá com vocês", () => restore(c, snap));
 }
 
 function fmtDay(ymd) {
@@ -190,8 +213,8 @@ function vacuum(c) {
   if (d === null) return { label: "envio sem data", cls: "muted" };
   if (d === 0) return { label: "mandado hoje", cls: "fresh" };
   if (d < 3) return { label: `${d}d · fresquinho`, cls: "fresh" };
-  if (d < 7) return { label: `${d}d de vácuo 🥲`, cls: "warm" };
-  return { label: `${d}d · vácuo raiz 💀`, cls: "cold" };
+  if (d < 7) return { label: `${d}d de vácuo`, cls: "warm" };
+  return { label: `${d}d · vácuo raiz`, cls: "cold" };
 }
 
 function isDue(c) {
@@ -322,7 +345,7 @@ function qualBadge(c) {
 
 const NAV = [
   { id: "inicio", icon: "◈", label: "Hoje" },
-  { id: "turbo", icon: "⚡", label: "Modo turbo", badge: () => contactsOf("private").filter(c => c.status === "A enviar").length },
+  { id: "turbo", icon: "⚡︎", label: "Modo turbo", badge: () => contactsOf("private").filter(c => c.status === "A enviar").length },
   { id: "contatos", icon: "☷", label: "Contatos", badge: () => contactsOf("private").filter(c => TALKING.includes(c.status)).length, badgeHot: true },
   { id: "projetos", icon: "▦", label: "Projetos", badge: () => Store.projects.filter(p => p.status !== "Entregue").length },
   { id: "prefeituras", icon: "⌂", label: "Prefeituras", later: true },
@@ -341,10 +364,10 @@ function renderChrome() {
   const me = actor();
   if (Store.mode === "cloud") {
     $("#who").innerHTML = Store.member ? `<span class="who">${personDot(me)}<span>${esc(me)}</span></span>` : "";
-    $("#sidebar-foot").innerHTML = Store.member ? `<div class="sync"><span class="live"></span>Sincronizado com a dupla</div><button class="link" data-action="sign-out" type="button">Sair da conta</button>` : "";
+    $("#sidebar-foot").innerHTML = Store.member ? `<button class="side-settings" data-action="settings" type="button">⚙ Metas e ajustes</button><div class="sync"><span class="live"></span>Sincronizado com a dupla</div><button class="link" data-action="sign-out" type="button">Sair da conta</button>` : "";
   } else {
     $("#who").innerHTML = `<label class="who">${personDot(me)}<span class="sr-only">Usando como</span><select id="actor" aria-label="Usando como">${opts(TEAM, me)}</select></label>`;
-    $("#sidebar-foot").innerHTML = `<div class="sync demo"><span class="live"></span>Modo demonstração</div><p>Tudo fica salvo só neste navegador até o Supabase ser ligado.</p><button class="link" data-action="reset-demo" type="button">Restaurar dados de exemplo</button>`;
+    $("#sidebar-foot").innerHTML = `<button class="side-settings" data-action="settings" type="button">⚙ Metas e ajustes</button><div class="sync demo"><span class="live"></span>Modo demonstração</div><p>Tudo fica salvo só neste navegador até o Supabase ser ligado.</p><button class="link" data-action="reset-demo" type="button">Restaurar dados de exemplo</button>`;
   }
   $("#quick-add-top").hidden = Store.mode === "cloud" && !Store.member;
 }
@@ -366,43 +389,37 @@ function homePage() {
   const due = waiting.filter(isDue);
   const talking = priv.filter(c => TALKING.includes(c.status)).sort((a, b) => TALKING.indexOf(b.status) - TALKING.indexOf(a.status));
   const meetings = priv.filter(c => c.meetingAt && c.meetingAt.slice(0, 10) >= today()).sort((a, b) => a.meetingAt.localeCompare(b.meetingAt));
-  const goal = Number(Store.local.read("goal", 5));
-  const mine = sentTodayBy(me);
-  const pct = Math.min(100, Math.round((mine / goal) * 100));
+  const goal = goalOf(me);
+  const mine = sentThisWeek(me);
+  const team = sentThisWeek();
+  const daysLeft = 7 - ((new Date().getDay() + 6) % 7);
   const feed = Store.contacts.flatMap(c => (c.history || []).map(h => ({ ...h, id: c.id, name: shortName(c) }))).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 7);
   const active = Store.projects.filter(p => p.status !== "Entregue");
-  const ticker = [...JOKES.ticker, ...JOKES.ticker].map(t => `<span>✳ ${esc(t)}</span>`).join("");
-  const mood = mine >= goal ? "Missão cumprida. Pode até abrir o Instagram sem culpa 😎" : mine ? `Faltam ${goal - mine}. Tá indo bem, não para agora.` : toSend.length ? "Nenhuma mensagem hoje ainda. O primeiro “oi” é o mais difícil." : "Fila vazia. Hora de caçar contatos novos.";
+  const next = turboList("novos")[0];
+  const mood = mine >= goal ? "Meta da semana batida. O resto é bônus." : mine ? `Faltam ${goal - mine} mensagens e ${daysLeft} ${daysLeft === 1 ? "dia" : "dias"} na semana.` : due.length ? `${due.length} ${due.length === 1 ? "pessoa está" : "pessoas estão"} esperando um retorno educado.` : toSend.length ? "Nenhuma mensagem nesta semana ainda. O primeiro “oi” é o mais difícil." : "Fila vazia. Hora de caçar contatos novos.";
+  const blocks = Array.from({ length: Math.max(goal, mine) }, (_, i) => `<i class="${i < mine ? (i < goal ? "on" : "extra") : ""}" style="--d:${i * 40}ms"></i>`).join("");
 
   return `
   <section class="hero rise" style="--i:0">
     <div class="hero-copy">
       <span class="kicker">${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</span>
-      <h1>${greeting()}, <span class="hl">${esc(me)}</span>.</h1>
+      <h1>${greeting()},<br><span class="hl">${esc(me)}</span>.</h1>
       <p>${esc(mood)}</p>
-      <div class="mission">
-        <div class="mission-top"><span>Missão do dia</span><button class="link" data-action="goal" type="button">meta: ${goal} msgs ✎</button></div>
-        <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${mine}" aria-label="Mensagens enviadas hoje"><div style="width:${pct}%"></div><span class="meter-emoji" style="left:${pct}%">${mine >= goal ? "🏆" : "🏃"}</span></div>
-        <div class="mission-foot"><strong>${mine}/${goal}</strong> mandadas por você hoje · ${sentTodayBy()} pela dupla</div>
-      </div>
       <div class="hero-actions">
-        <a class="btn primary big" href="#turbo" data-action="turbo-mode" data-mode="novos">⚡ Modo turbo <small>${toSend.length} na fila</small></a>
-        <a class="btn big" href="#turbo" data-action="turbo-mode" data-mode="retornos">↶ Retornos <small>${due.length} vencidos</small></a>
+        <a class="btn primary big" href="#turbo" data-action="turbo-mode" data-mode="novos">Modo turbo <small>${toSend.length} na fila</small></a>
+        <a class="btn big dark" href="#turbo" data-action="turbo-mode" data-mode="retornos">Retornos <small>${due.length} vencidos</small></a>
       </div>
     </div>
-    <div class="hero-art" aria-hidden="true">
-      <div class="phone">
-        <div class="phone-top"><span class="avatar t2">CL</span><div><strong>Cliente dos sonhos</strong><small>visto por último hoje às 09:41</small></div></div>
-        <div class="bubble me b1">Oi, tudo bem? Posso te mostrar em 10 min? 🙂<i>✓✓</i></div>
-        <div class="bubble them b2"><span class="typing"><i></i><i></i><i></i></span></div>
-        <div class="bubble them b3">opa, pode sim! quanto fica?</div>
-      </div>
-      <span class="float-sticker f1">visualizou 👀</span>
-      <span class="float-sticker f2">R$ ✦ em breve</span>
+    <div class="goal-card">
+      <header><span class="kicker">meta da semana</span><button class="link" data-action="settings" type="button">ajustar metas</button></header>
+      <div class="goal-big"><strong>${mine}</strong><span>/ ${goal} mensagens suas</span></div>
+      <div class="blocks" role="img" aria-label="${mine} de ${goal} mensagens">${blocks}</div>
+      <ul class="goal-people">${TEAM.map(p => { const n = sentThisWeek(p), g = goalOf(p); return `<li>${personDot(p)}<span>${esc(p)}</span><span class="mini-bar"><i style="width:${Math.min(100, (n / g) * 100)}%"></i></span><b>${n}/${g}</b></li>`; }).join("")}</ul>
+      <p class="goal-foot">${team} pela dupla nesta semana · ${sentTodayBy()} hoje</p>
+      ${next ? `<div class="up-next"><div><span class="kicker">próximo da fila</span><strong>${esc(shortName(next))}</strong><small>${esc([next.category, next.city].filter(Boolean).join(" · "))}</small></div><a class="btn small" href="#turbo" data-action="turbo-mode" data-mode="novos">Mandar →</a></div>` : ""}
     </div>
   </section>
-  <div class="ticker rise" style="--i:1" aria-hidden="true"><div>${ticker}</div></div>
-  <section class="funnel rise" style="--i:2" aria-label="Funil">
+  <section class="funnel rise" style="--i:1" aria-label="Funil">
     ${STAGES.map(s => { const n = priv.filter(s.match).length; return `<a href="#contatos" data-action="stage" data-stage="${s.id}" class="stage st-${s.id}"><span class="stage-icon">${s.icon}</span><strong>${pad(n)}</strong><span>${s.label}</span><i style="--w:${priv.length ? Math.max(4, (n / priv.length) * 100) : 0}%"></i></a>`; }).join("")}
   </section>
   <div class="home-grid">
@@ -414,7 +431,7 @@ function homePage() {
           <button class="line-main" data-action="open" data-id="${c.id}" type="button"><strong>${esc(shortName(c))}</strong><small>${statusPill(c.status)} ${c.meetingAt ? "· " + esc(fmtWhen(c.meetingAt)) : ""}</small></button>
           ${personDot(c.owner)}
           <button class="btn small" data-action="open" data-id="${c.id}" data-template="${c.status === "Respondeu" ? "meet" : c.status === "Reunião marcada" ? "after" : c.status === "Proposta enviada" ? "nudge" : "proposal"}" type="button">Responder ↗</button>
-        </div>`).join("") : `<div class="empty-mini"><b>🦗</b><p>Ninguém respondeu ainda. Normal. Bora encher a fila de mensagens.</p></div>`}
+        </div>`).join("") : `<div class="empty-mini"><b>…</b><p>Ninguém respondeu ainda. Normal. Bora encher a fila de mensagens.</p></div>`}
     </section>
     <section class="panel rise" style="--i:4">
       <header><div><span class="kicker">hora do follow-up educado</span><h2>No vácuo <em>${waiting.length}</em></h2></div><a class="link" href="#turbo" data-action="turbo-mode" data-mode="retornos">cutucar em série</a></header>
@@ -424,26 +441,26 @@ function homePage() {
           <button class="line-main" data-action="open" data-id="${c.id}" type="button"><strong>${esc(shortName(c))}</strong><small><span class="vac v-${v.cls}">${esc(v.label)}</span>${c.returnAt ? ` · retorno ${esc(relDay(c.returnAt))}` : ""}</small></button>
           <button class="icon-btn" data-action="go" data-id="${c.id}" data-mode="followupMessage" type="button" title="Copiar retorno e abrir canal" aria-label="Cutucar ${esc(shortName(c))}">↗</button>
           <button class="icon-btn ok" data-action="sent" data-id="${c.id}" data-mode="followupMessage" type="button" title="Já mandei o retorno" aria-label="Marcar retorno enviado para ${esc(shortName(c))}">✓</button>
-        </div>`; }).join("") : `<div class="empty-mini"><b>🧘</b><p>Ninguém te deixando no vácuo. Paz interior desbloqueada.</p></div>`}
+        </div>`; }).join("") : `<div class="empty-mini"><b>✓</b><p>Ninguém te deixando no vácuo. Paz interior desbloqueada.</p></div>`}
     </section>
     <section class="panel rise" style="--i:5">
       <header><div><span class="kicker">agenda</span><h2>Conversas marcadas</h2></div></header>
       ${meetings.length ? meetings.slice(0, 4).map(c => `
-        <button class="agenda" data-action="open" data-id="${c.id}" type="button"><span class="date-chip"><b>${new Date(c.meetingAt).getDate()}</b>${new Date(c.meetingAt).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</span><span><strong>${esc(shortName(c))}</strong><small>${esc(fmtWhen(c.meetingAt))} · ${esc(ownerLabel(c.owner))}</small></span></button>`).join("") : talking.some(c => c.status === "Reunião marcada") ? `<div class="empty-mini"><b>📅</b><p>Tem reunião marcada sem data registrada. Abra a ficha e anote o dia.</p><button class="btn small" data-action="open" data-id="${talking.find(c => c.status === "Reunião marcada").id}" type="button">Anotar data</button></div>` : `<div class="empty-mini"><b>📅</b><p>Quando marcarem uma conversa, ela aparece aqui.</p></div>`}
+        <button class="agenda" data-action="open" data-id="${c.id}" type="button"><span class="date-chip"><b>${new Date(c.meetingAt).getDate()}</b>${new Date(c.meetingAt).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</span><span><strong>${esc(shortName(c))}</strong><small>${esc(fmtWhen(c.meetingAt))} · ${esc(ownerLabel(c.owner))}</small></span></button>`).join("") : talking.some(c => c.status === "Reunião marcada") ? `<div class="empty-mini"><b>▦</b><p>Tem reunião marcada sem data registrada. Abra a ficha e anote o dia.</p><button class="btn small" data-action="open" data-id="${talking.find(c => c.status === "Reunião marcada").id}" type="button">Anotar data</button></div>` : `<div class="empty-mini"><b>▦</b><p>Quando marcarem uma conversa, ela aparece aqui.</p></div>`}
     </section>
     <section class="panel rise" style="--i:6">
       <header><div><span class="kicker">da conversa à entrega</span><h2>Projetos <em>${active.length}</em></h2></div><a class="link" href="#projetos">abrir</a></header>
-      ${active.length ? active.slice(0, 4).map(p => { const done = p.tasks.filter(t => t.status === "Feito").length; return `<a class="line" href="#projetos" data-action="open-project" data-id="${p.id}">${avatar(p.name)}<span class="line-main"><strong>${esc(p.name)}</strong><small>${done}/${p.tasks.length} tarefas · ${esc(p.owner || "Dupla")}</small></span><span class="mini-bar"><i style="width:${p.tasks.length ? (done / p.tasks.length) * 100 : 0}%"></i></span></a>`; }).join("") : `<div class="empty-mini"><b>🛠️</b><p>Fechou um cliente? Crie o projeto pela ficha do contato.</p><button class="btn small" data-action="new-project" type="button">＋ Projeto</button></div>`}
+      ${active.length ? active.slice(0, 4).map(p => { const done = p.tasks.filter(t => t.status === "Feito").length; return `<a class="line" href="#projetos" data-action="open-project" data-id="${p.id}">${avatar(p.name)}<span class="line-main"><strong>${esc(p.name)}</strong><small>${done}/${p.tasks.length} tarefas · ${esc(p.owner || "Dupla")}</small></span><span class="mini-bar"><i style="width:${p.tasks.length ? (done / p.tasks.length) * 100 : 0}%"></i></span></a>`; }).join("") : `<div class="empty-mini"><b>▤</b><p>Fechou um cliente? Crie o projeto pela ficha do contato.</p><button class="btn small" data-action="new-project" type="button">＋ Projeto</button></div>`}
     </section>
   </div>
   <section class="panel feed rise" style="--i:7">
     <header><div><span class="kicker">últimas movimentações</span><h2>O que a dupla andou fazendo</h2></div></header>
-    ${feed.length ? `<ol>${feed.map(h => `<li><button data-action="open" data-id="${h.id}" type="button">${personDot(h.actor)}<span><strong>${esc(h.actor)}</strong> ${esc(h.text.charAt(0).toLowerCase() + h.text.slice(1))} · <em>${esc(h.name)}</em></span><small>${esc(ago(h.at))}</small></button></li>`).join("")}</ol>` : '<div class="empty-mini"><b>📭</b><p>Nada por aqui ainda. Mande a primeira mensagem e ela aparece nesse mural.</p></div>'}
+    ${feed.length ? `<ol>${feed.map(h => `<li><button data-action="open" data-id="${h.id}" type="button">${personDot(h.actor)}<span><strong>${esc(h.actor)}</strong> ${esc(h.text.charAt(0).toLowerCase() + h.text.slice(1))} · <em>${esc(h.name)}</em></span><small>${esc(ago(h.at))}</small></button></li>`).join("")}</ol>` : '<div class="empty-mini"><b>○</b><p>Nada por aqui ainda. Mande a primeira mensagem e ela aparece nesse mural.</p></div>'}
   </section>`;
 }
 
-function turboList() {
-  const t = ui.turbo;
+function turboList(forceMode) {
+  const t = forceMode ? { ...ui.turbo, mode: forceMode, owner: "meus", category: "Todos" } : ui.turbo;
   const me = actor();
   let list = contactsOf("private").filter(c => (t.mode === "novos" ? c.status === "A enviar" : c.status === "Aguardando resposta"));
   if (t.owner === "meus") list = list.filter(c => !c.owner || c.owner === me);
@@ -476,7 +493,7 @@ function turboPage() {
   const total = t.queue.length;
   const head = `
   <section class="turbo-head">
-    <div><span class="kicker">copiar · abrir · mandar · repetir</span><h1>Modo turbo <span class="bolt">⚡</span></h1></div>
+    <div><span class="kicker">copiar · abrir · mandar · repetir</span><h1>Modo turbo <span class="bolt">⚡︎</span></h1></div>
     <div class="turbo-controls">
       <div class="seg" role="tablist" aria-label="Fila">
         <button role="tab" aria-selected="${t.mode === "novos"}" class="${t.mode === "novos" ? "on" : ""}" data-action="turbo-mode" data-mode="novos" type="button">Primeiro contato <small>${novos}</small></button>
@@ -490,7 +507,7 @@ function turboPage() {
     </div>
   </section>`;
   if (!c) {
-    return head + `<section class="turbo-done rise" style="--i:0"><div class="big-emoji">${t.sent ? "🏆" : "☕"}</div><h2>${esc(pick(JOKES.done))}</h2><p>${t.sent ? `Você mandou ${t.sent} nesta sessão. Agora é esperar o “digitando…”.` : "Nenhum contato nessa fila com esses filtros."}</p><div class="hero-actions"><button class="btn primary" data-action="quick-add" type="button">＋ Adicionar contatos</button><button class="btn" data-action="turbo-mode" data-mode="${t.mode === "novos" ? "retornos" : "novos"}" type="button">Ir para ${t.mode === "novos" ? "retornos" : "primeiro contato"}</button></div></section>`;
+    return head + `<section class="turbo-done rise" style="--i:0"><div class="big-emoji">${t.sent ? "✓" : "○"}</div><h2>${esc(pick(JOKES.done))}</h2><p>${t.sent ? `Você mandou ${t.sent} nesta sessão. Agora é esperar o “digitando…”.` : "Nenhum contato nessa fila com esses filtros."}</p><div class="hero-actions"><button class="btn primary" data-action="quick-add" type="button">＋ Adicionar contatos</button><button class="btn" data-action="turbo-mode" data-mode="${t.mode === "novos" ? "retornos" : "novos"}" type="button">Ir para ${t.mode === "novos" ? "retornos" : "primeiro contato"}</button></div></section>`;
   }
   const text = messageFor(c, mode);
   const ch = channels(c, text);
@@ -516,7 +533,7 @@ function turboPage() {
         <button class="link" data-action="turbo-back" type="button" ${t.index ? "" : "disabled"}>← voltar</button>
         <button class="link" data-action="turbo-skip" type="button">pular <kbd>→</kbd></button>
         <button class="link" data-action="turbo-later" type="button">não compensa agora</button>
-        ${t.mode === "retornos" ? '<button class="link" data-action="turbo-replied" type="button">ele respondeu! 🎉</button>' : ""}
+        ${t.mode === "retornos" ? '<button class="link" data-action="turbo-replied" type="button">ele respondeu!</button>' : ""}
       </div>
     </article>
     <aside class="turbo-side">
@@ -550,7 +567,7 @@ function turboAdvance(action) {
     log(c, "Ficou pra depois (não compensa agora)", "status");
     Store.saveContact(c, { silent: true });
     t.queue.splice(t.index, 1);
-    toast("Foi pra geladeira 🧊", () => restore(c, snap));
+    toast("Foi pra geladeira", () => restore(c, snap));
   } else if (action === "replied" && c) {
     logReply(c, "");
     t.queue.splice(t.index, 1);
@@ -597,7 +614,7 @@ function contactsPage() {
 }
 
 function listView(rows) {
-  if (!rows.length) return `<div class="empty"><div class="big-emoji">🔍</div><h2>Ninguém por aqui.</h2><p>Troque o filtro ou adicione um contato novo.</p><button class="btn primary" data-action="quick-add" type="button">＋ Novo contato</button></div>`;
+  if (!rows.length) return `<div class="empty"><div class="big-emoji">⌕</div><h2>Ninguém por aqui.</h2><p>Troque o filtro ou adicione um contato novo.</p><button class="btn primary" data-action="quick-add" type="button">＋ Novo contato</button></div>`;
   return `<div class="list">${rows.slice(0, ui.limit).map((c, i) => {
     const v = c.status === "Aguardando resposta" ? vacuum(c) : null;
     const last = c.history?.[0];
@@ -658,7 +675,7 @@ function renderDrawer() {
   <header class="d-head">
     ${avatar(shortName(c), "lg")}
     <div><span class="kicker">${esc([c.category, c.city].filter(Boolean).join(" · "))}</span><h2>${esc(c.name)}</h2>
-    <div class="d-tags">${statusPill(c.status)}${v ? `<span class="vac v-${v.cls}">${esc(v.label)}</span>` : ""}${c.proposal ? `<span class="tag ink">${esc(c.proposal)}</span>` : ""}${qualBadge(c)}${c.person ? `<span class="tag">👤 ${esc(c.person)}</span>` : ""}</div></div>
+    <div class="d-tags">${statusPill(c.status)}${v ? `<span class="vac v-${v.cls}">${esc(v.label)}</span>` : ""}${c.proposal ? `<span class="tag ink">${esc(c.proposal)}</span>` : ""}${qualBadge(c)}${c.person ? `<span class="tag"> ${esc(c.person)}</span>` : ""}</div></div>
     <button class="btn small" data-action="edit-contact" data-id="${c.id}" type="button">✎ Editar</button>
   </header>
   <section class="d-block msg-block">
@@ -675,7 +692,7 @@ function renderDrawer() {
     <div class="seg small">${["", ...TEAM].map(o => `<button class="${(c.owner || "") === o ? "on" : ""}" data-action="set-owner" data-id="${c.id}" data-value="${o}" type="button">${o ? personDot(o) : ""}${esc(ownerLabel(o))}</button>`).join("")}</div>
   </section>
   <section class="d-block reply-block">
-    <h3>Responderam? 🎉</h3>
+    <h3>Responderam?</h3>
     <textarea id="d-reply" placeholder="Cole aqui o que responderam (opcional)" rows="2"></textarea>
     <button class="btn small" data-action="log-reply" data-id="${c.id}" type="button">Registrar resposta</button>
   </section>
@@ -730,7 +747,7 @@ function newContact(data) {
 function quickAddForm() {
   const cats = [...new Set(Store.contacts.map(c => c.category).filter(Boolean))].sort();
   modal(`
-  <span class="kicker">mais uma porta pra bater 🚪</span>
+  <span class="kicker">mais uma porta pra bater</span>
   <h2>Novo contato</h2>
   <form id="quick-form" class="form">
     <div class="field"><label for="q-handle">Cole o WhatsApp, @, link ou e-mail</label><input id="q-handle" name="handle" autocomplete="off" placeholder="ex.: (84) 99999-0000 ou instagram.com/loja" autofocus><span class="detect" id="q-detect"></span></div>
@@ -742,7 +759,7 @@ function quickAddForm() {
     </div>
     <div class="field"><label for="q-message">Mensagem</label><textarea id="q-message" name="message">${esc(fillTemplate(DEFAULT_MESSAGE, {}))}</textarea></div>
     <label class="check"><input type="checkbox" name="already"> Já mandei mensagem pra esse contato</label>
-    <div class="form-actions"><button class="btn primary" type="submit">Adicionar ✓</button><button class="btn" type="submit" name="go" value="turbo">Adicionar e mandar agora ⚡</button></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Adicionar ✓</button><button class="btn" type="submit" name="go" value="turbo">Adicionar e mandar agora ⚡︎</button></div>
   </form>`);
   const detect = () => { const p = parseHandle($("#q-handle").value); $("#q-detect").textContent = p.channel ? `✓ ${p.channel} detectado` : ""; };
   $("#q-handle").oninput = detect;
@@ -773,7 +790,7 @@ function quickAddForm() {
 
 function bulkAddForm() {
   modal(`
-  <span class="kicker">modo atacadão 📦</span>
+  <span class="kicker">modo atacadão</span>
   <h2>Colar vários contatos</h2>
   <p class="hint">Um por linha, separado por <b>;</b> ou <b>tab</b> (dá pra colar direto da planilha): <code>Nome; contato; tipo; cidade</code></p>
   <form id="bulk-form" class="form">
@@ -793,7 +810,7 @@ function bulkAddForm() {
     });
     $("#modal").close();
     render();
-    toast(`${lines.length} contatos novos na fila 📦`);
+    toast(`${lines.length} contatos novos na fila`);
   };
 }
 
@@ -964,7 +981,7 @@ function projectsPage() {
       <div class="meter thin"><div style="width:${p.tasks.length ? (done / p.tasks.length) * 100 : 0}%"></div></div>
       <div class="pc-foot"><span>${done}/${p.tasks.length} tarefas</span><span>${p.deadline ? "prazo " + esc(fmtDay(p.deadline)) : "sem prazo"}</span></div>
       <button class="btn small" data-action="open-project" data-id="${p.id}" type="button">${open?.id === p.id ? "Aberto ↓" : "Abrir ↗"}</button>
-    </article>`; }).join("") || `<div class="empty"><div class="big-emoji">🛠️</div><h2>${ui.projectTab === "Entregues" ? "As entregas aparecem aqui." : "Nenhum projeto ainda."}</h2><p>Quando um cliente fechar, crie o projeto pela ficha dele.</p><button class="btn" data-action="demo-project" type="button">Ver exemplo com o LabDemo</button></div>`}</div>
+    </article>`; }).join("") || `<div class="empty"><div class="big-emoji">▤</div><h2>${ui.projectTab === "Entregues" ? "As entregas aparecem aqui." : "Nenhum projeto ainda."}</h2><p>Quando um cliente fechar, crie o projeto pela ficha dele.</p><button class="btn" data-action="demo-project" type="button">Ver exemplo com o LabDemo</button></div>`}</div>
   ${open ? projectWorkspace(open) : ""}`;
 }
 
@@ -993,19 +1010,20 @@ function projectWorkspace(p) {
 }
 
 function libraryPage() {
-  const files = [["Proposta comercial", "Escopo e preço para mandar depois da conversa.", "modelos/proposta_comercial.docx", "📄"], ["Sequência de e-mails", "Primeiro contato, retorno, pós-conversa e cobrança.", "divulgacao/emails.md", "✉️"], ["Instagram", "Bio, legendas e como prospectar sem falar com estranhos.", "divulgacao/instagram.md", "📸"], ["Declarações", "Modelos para contratação pública.", "modelos/declaracoes_contratacao.docx", "🧾"], ["Atestado técnico", "Para o cliente emitir depois da entrega.", "modelos/atestado_capacidade_tecnica_modelo.docx", "🏅"], ["Tratamento de dados", "Termo de LGPD para os sistemas.", "modelos/termo_tratamento_dados.docx", "🔐"], ["Abrir a empresa", "Passo a passo do CNPJ sem contador.", "empresa_sem_contador.md", "🏢"]];
+  const files = [["Proposta comercial", "Escopo e preço para mandar depois da conversa.", "modelos/proposta_comercial.docx", "01"], ["Sequência de e-mails", "Primeiro contato, retorno, pós-conversa e cobrança.", "divulgacao/emails.md", "02"], ["Instagram", "Bio, legendas e como prospectar sem falar com estranhos.", "divulgacao/instagram.md", "03"], ["Declarações", "Modelos para contratação pública.", "modelos/declaracoes_contratacao.docx", "04"], ["Atestado técnico", "Para o cliente emitir depois da entrega.", "modelos/atestado_capacidade_tecnica_modelo.docx", "05"], ["Tratamento de dados", "Termo de LGPD para os sistemas.", "modelos/termo_tratamento_dados.docx", "06"], ["Abrir a empresa", "Passo a passo do CNPJ sem contador.", "empresa_sem_contador.md", "07"]];
   return pageHead("o arsenal", "Materiais", "Modelos e arquivos do kit para a hora de mandar proposta.") + `
   <div class="library">${files.map(([t, d, u, e], i) => `<a class="lib-card rise" style="--i:${i}" href="kit/${u}" download><span class="lib-emoji">${e}</span><h3>${t}</h3><p>${d}</p><span class="link">baixar ↓</span></a>`).join("")}
-  <a class="lib-card rise" style="--i:8" href="#prefeituras"><span class="lib-emoji">🏛️</span><h3>Prefeituras</h3><p>79 secretarias guardadas para depois do CNPJ.</p><span class="link">abrir →</span></a>
-  <a class="lib-card rise" style="--i:9" href="plano-original.html" target="_blank" rel="noopener"><span class="lib-emoji">🗺️</span><h3>Plano original</h3><p>Rota Alto Oeste: projeção, preços e contatos.</p><span class="link">abrir ↗</span></a></div>`;
+  <button class="lib-card rise" style="--i:7" data-action="settings" type="button"><span class="lib-emoji">⚙</span><h3>Metas e ajustes</h3><p>Meta semanal de cada um e prazos dos lembretes.</p><span class="link">ajustar →</span></button>
+  <a class="lib-card rise" style="--i:8" href="#prefeituras"><span class="lib-emoji">08</span><h3>Prefeituras</h3><p>79 secretarias guardadas para depois do CNPJ.</p><span class="link">abrir →</span></a>
+  <a class="lib-card rise" style="--i:9" href="plano-original.html" target="_blank" rel="noopener"><span class="lib-emoji">09</span><h3>Plano original</h3><p>Rota Alto Oeste: projeção, preços e contatos.</p><span class="link">abrir ↗</span></a></div>`;
 }
 
 function authPage() {
   if (Store.user && !Store.member) {
-    return `<section class="auth rise" style="--i:0"><div class="big-emoji">🚪</div><h1>Quase lá.</h1><p>Você entrou como <strong>${esc(Store.user.email)}</strong>, mas esse usuário ainda não está na lista da dupla.</p><p class="hint">Peça para adicionar o e-mail na tabela <code>members</code> do Supabase.</p><button class="btn" data-action="sign-out" type="button">Sair</button></section>`;
+    return `<section class="auth rise" style="--i:0"><div class="big-emoji">→</div><h1>Quase lá.</h1><p>Você entrou como <strong>${esc(Store.user.email)}</strong>, mas esse usuário ainda não está na lista da dupla.</p><p class="hint">Peça para adicionar o e-mail na tabela <code>members</code> do Supabase.</p><button class="btn" data-action="sign-out" type="button">Sair</button></section>`;
   }
   return `<section class="auth rise" style="--i:0">
-    <span class="kicker">área restrita da dupla</span><h1>Entra aí 👋</h1><p>Só Kellyson e Jeyce passam daqui.</p>
+    <span class="kicker">área restrita da dupla</span><h1>Entra aí</h1><p>Só Kellyson e Jeyce passam daqui.</p>
     <form id="auth-form" class="form">
       <div class="field"><label for="a-user">Usuário</label><input id="a-user" name="user" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="kellyson ou jeyce" required></div>${input("a-password", "password", "Senha", "", "password", true)}
       <div class="form-actions"><button class="btn primary grow" type="submit">Entrar</button></div>
@@ -1033,7 +1051,7 @@ function render() {
         const user = f.user.trim().toLowerCase();
         await Store.signIn(user.includes("@") ? user : `${user}@rota-studio.app`, f.password);
       } catch (err) {
-        msg.textContent = /invalid login/i.test(err.message) ? "Usuário ou senha não batem 🤔" : err.message;
+        msg.textContent = /invalid login/i.test(err.message) ? "Usuário ou senha não batem" : err.message;
       }
     };
     return;
@@ -1080,11 +1098,12 @@ const actions = {
   copy: el => {
     const c = byId(el.dataset.id);
     const text = el.dataset.from === "drawer" ? $("#d-msg").value : el.dataset.from === "turbo" ? $("#turbo-msg").value : messageFor(c, el.dataset.mode);
-    copy(text, "Mensagem copiada");
+    copy(text, claim(c) ? "Mensagem copiada · agora o contato é seu" : "Mensagem copiada");
   },
   go: el => {
     const c = byId(el.dataset.id);
     const text = el.dataset.from === "drawer" ? $("#d-msg").value : el.dataset.from === "turbo" ? $("#turbo-msg").value : messageFor(c, el.dataset.mode);
+    claim(c);
     copyAndOpen(c, text, el.dataset.channel);
   },
   sent: el => markSent(byId(el.dataset.id), el.dataset.mode),
@@ -1106,9 +1125,24 @@ const actions = {
   "turbo-back": () => turboAdvance("back"),
   "turbo-later": () => turboAdvance("later"),
   "turbo-replied": () => turboAdvance("replied"),
-  goal: () => {
-    modal(`<span class="kicker">sem pressão (mas com pressão)</span><h2>Meta diária</h2><form id="goal-form" class="form"><div class="seg">${[3, 5, 10, 15].map(n => `<button type="submit" name="goal" value="${n}" class="${Number(Store.local.read("goal", 5)) === n ? "on" : ""}">${n} msgs</button>`).join("")}</div></form>`);
-    $("#goal-form").onsubmit = e => { e.preventDefault(); Store.local.write("goal", Number(e.submitter.value)); $("#modal").close(); render(); };
+  settings: () => {
+    const cfg = settings();
+    modal(`<span class="kicker">ajustes da dupla</span><h2>Metas e lembretes</h2>
+    <form id="settings-form" class="form">
+      <div class="field-grid">${TEAM.map(p => `<div class="field"><label for="g-${p}">Meta semanal · ${p}</label><input id="g-${p}" name="goal-${p}" type="number" min="1" max="200" value="${goalOf(p)}"></div>`).join("")}
+        <div class="field"><label for="s-return">Lembrar do retorno após o 1º contato (dias)</label><input id="s-return" name="returnDays" type="number" min="1" max="30" value="${cfg.returnDays}"></div>
+        <div class="field"><label for="s-follow">Lembrar de novo após um retorno (dias)</label><input id="s-follow" name="followupDays" type="number" min="1" max="60" value="${cfg.followupDays}"></div>
+      </div>
+      <p class="hint">Vale para os dois e sincroniza na hora. A semana começa na segunda.</p>
+      <div class="form-actions"><button class="btn primary" type="submit">Salvar ajustes</button></div>
+    </form>`);
+    $("#settings-form").onsubmit = e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      Store.saveSettings({ weeklyGoal: Object.fromEntries(TEAM.map(p => [p, Math.max(1, Number(f["goal-" + p]) || 8)])), returnDays: Math.max(1, Number(f.returnDays) || 3), followupDays: Math.max(1, Number(f.followupDays) || 5) });
+      $("#modal").close();
+      toast("Ajustes salvos");
+    };
   },
   "new-project": el => projectForm(el.dataset.id ? byId(el.dataset.id) : null),
   "demo-project": () => demoProject(),
@@ -1127,7 +1161,7 @@ const actions = {
   "copy-brief": el => copy(projectText(projectById(el.dataset.id), false), "Briefing copiado"),
   "reset-demo": () => {
     modal(`<h2>Restaurar a demonstração?</h2><p>Apaga os testes feitos neste navegador e volta aos dados do Miro.</p><div class="form-actions"><button class="btn danger" id="confirm-reset" type="button">Restaurar</button></div>`);
-    $("#confirm-reset").onclick = () => { Store.resetDemo(); ui.turbo.built = false; $("#modal").close(); toast("Tudo como novo ✨"); };
+    $("#confirm-reset").onclick = () => { Store.resetDemo(); ui.turbo.built = false; $("#modal").close(); toast("Tudo como novo"); };
   },
   "sign-out": () => Store.signOut()
 };
@@ -1153,7 +1187,7 @@ document.addEventListener("change", e => {
   if (el.id === "actor") {
     Store.local.write("actor", el.value);
     ui.turbo.built = false;
-    toast(`Agora você é ${el.value} 🎭`);
+    toast(`Agora você é ${el.value}`);
     return render();
   }
   if (!f) return;
@@ -1172,7 +1206,7 @@ document.addEventListener("change", e => {
     const t = p.tasks.find(x => x.id === el.dataset.id);
     t.status = el.value;
     Store.saveProject(p);
-    if (el.value === "Feito") toast(pick(["Tarefa feita ✓ Próxima!", "Riscou da lista. Que sensação boa 😌", "Feito! O cliente nem imagina o esforço."]));
+    if (el.value === "Feito") toast(pick(["Tarefa feita ✓ Próxima!", "Riscou da lista. Que sensação boa", "Feito! O cliente nem imagina o esforço."]));
   } else if (f === "criterion") {
     const p = projectById(el.dataset.project);
     p.tasks.find(x => x.id === el.dataset.id).checklist[Number(el.dataset.index)].done = el.checked;
@@ -1236,9 +1270,10 @@ function isEditing() {
 
 Store.onChange((reason, detail) => {
   if (reason === "error") return toast("Ops, não salvou: " + detail);
+  if (reason === "inbound") toast(`${detail} ${detail === 1 ? "pedido novo chegou" : "pedidos novos chegaram"} pelo site`);
   if (reason === "remote" && detail?.by && detail.by !== actor()) {
     const c = detail.table === "contacts" ? byId(detail.id) : projectById(detail.id);
-    if (c) toast(`${detail.by} mexeu em ${shortName(c)} 👀`);
+    if (c) toast(`${detail.by} mexeu em ${shortName(c)}`);
   }
   if (reason === "load" || reason === "auth") ui.turbo.built = false;
   if ($("#drawer").open) {
