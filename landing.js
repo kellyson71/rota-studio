@@ -63,8 +63,8 @@ $(".g-row.r1").innerHTML = rowShots + rowShots;
 $(".g-row.r2").innerHTML = [...PROJECTS].reverse().map(p => `<figure><img src="assets/shots/${p.id}.webp" alt="" loading="lazy" width="1200" height="750"></figure>`).join("").repeat(2);
 
 $("#toc").innerHTML = PROJECTS.map((p, i) => `
-  <li class="c-${p.color}">
-    <button class="toc-row" type="button" aria-expanded="${!i}" aria-controls="toc-${p.id}" data-peek="assets/shots/${p.id}.webp">
+  <li class="c-${p.color} ${i ? "" : "open"}">
+    <button class="toc-row" type="button" aria-expanded="${!i}" aria-controls="toc-${p.id}">
       <img class="toc-logo" src="assets/logos/${p.logo}.webp" alt="" width="56" height="56" loading="lazy">
       <span class="toc-name"><strong>${esc(p.name)}</strong><small>${esc(p.what)}</small></span>
       <span class="toc-lead" aria-hidden="true"></span>
@@ -73,56 +73,86 @@ $("#toc").innerHTML = PROJECTS.map((p, i) => `
       <span class="toc-more"><span class="t-open">Ver telas</span><span class="t-close">Fechar</span></span>
       <span class="toc-plus" aria-hidden="true"></span>
     </button>
-    <div class="toc-body" id="toc-${p.id}" ${i ? "hidden" : ""}>
-      <div class="toc-media">
-        <figure class="mini-frame"><div class="bar"><i></i><i></i><i></i><span>${esc(p.host)}</span></div><img src="assets/shots/${p.id}.webp" alt="Tela de ${esc(p.name)}" loading="lazy" width="1200" height="750"></figure>
-        <figure class="mini-phone"><img src="assets/shots/${p.id}-m.webp" alt="${esc(p.name)} no celular" loading="lazy" width="480" height="1039"></figure>
-      </div>
-      <div class="toc-info">
-        <p>${esc(p.result)}</p>
-        <div class="tags">${p.tags.map(t => `<span>${esc(t)}</span>`).join("")}</div>
-        <a class="btn" href="${p.url}" target="_blank" rel="noopener">Ver no ar ↗</a>
+    <div class="toc-panel" id="toc-${p.id}" ${i ? 'style="height:0px" inert' : 'style="height:auto"'}>
+      <div class="toc-body">
+        <div class="toc-media">
+          <figure class="mini-frame"><div class="bar"><i></i><i></i><i></i><span>${esc(p.host)}</span></div><img src="assets/shots/${p.id}.webp" alt="Tela de ${esc(p.name)}" loading="lazy" width="1200" height="750"></figure>
+          <figure class="mini-phone"><img src="assets/shots/${p.id}-m.webp" alt="${esc(p.name)} no celular" loading="lazy" width="480" height="1039"></figure>
+        </div>
+        <div class="toc-info">
+          <p>${esc(p.result)}</p>
+          <div class="tags">${p.tags.map(t => `<span>${esc(t)}</span>`).join("")}</div>
+          <a class="btn" href="${p.url}" target="_blank" rel="noopener">Ver no ar ↗</a>
+        </div>
       </div>
     </div>
   </li>`).join("");
 
-$$(".toc-row").forEach(btn => btn.addEventListener("click", () => {
-  const body = document.getElementById(btn.getAttribute("aria-controls"));
-  const open = btn.getAttribute("aria-expanded") === "true";
-  $$(".toc-row[aria-expanded=true]").forEach(b => { if (b !== btn) toggle(b, false); });
-  toggle(btn, !open);
-  if (!open && hasGsap) setTimeout(() => ScrollTrigger.refresh(), 450);
-}));
+const teaseHeight = () => (innerWidth < 560 ? 110 : 170);
+const panelOf = li => $(".toc-panel", li);
 
-function toggle(btn, open) {
-  const body = document.getElementById(btn.getAttribute("aria-controls"));
-  btn.setAttribute("aria-expanded", open);
-  if (reduce || !hasGsap) { body.hidden = !open; return; }
-  if (open) {
-    body.hidden = false;
-    gsap.fromTo(body, { height: 0, opacity: 0 }, { height: "auto", opacity: 1, duration: 0.55, ease: "power3.out", clearProps: "height" });
-    gsap.from($$("figure, p, .tags, .btn", body), { y: 24, opacity: 0, duration: 0.6, stagger: 0.06, ease: "power3.out", delay: 0.1 });
-  } else {
-    gsap.to(body, { height: 0, opacity: 0, duration: 0.35, ease: "power2.in", onComplete: () => { body.hidden = true; gsap.set(body, { clearProps: "all" }); } });
+function setHeight(panel, value) {
+  if (panel.style.height === "auto") {
+    panel.style.height = panel.scrollHeight + "px";
+    void panel.offsetHeight;
   }
+  panel.style.height = value;
 }
 
-const peek = $("#peek");
-const peekImg = $("img", peek);
-if (fine) {
-  $$("[data-peek]").forEach(a => {
-    a.addEventListener("mouseenter", () => { if (a.getAttribute("aria-expanded") === "true") return; peekImg.src = a.dataset.peek; peek.classList.add("on"); });
-    a.addEventListener("mouseleave", () => peek.classList.remove("on"));
-    a.addEventListener("click", () => peek.classList.remove("on"));
+function openItem(li) {
+  const panel = panelOf(li);
+  li.classList.remove("teasing");
+  li.classList.add("open");
+  $(".toc-row", li).setAttribute("aria-expanded", "true");
+  panel.inert = false;
+  setHeight(panel, panel.scrollHeight + "px");
+  const done = e => {
+    if (e.propertyName !== "height") return;
+    panel.removeEventListener("transitionend", done);
+    if (li.classList.contains("open")) panel.style.height = "auto";
+    if (hasGsap) ScrollTrigger.refresh();
+  };
+  panel.addEventListener("transitionend", done);
+  if (reduce) { panel.style.height = "auto"; if (hasGsap) ScrollTrigger.refresh(); }
+}
+
+function closeItem(li) {
+  const panel = panelOf(li);
+  li.classList.remove("open", "teasing");
+  $(".toc-row", li).setAttribute("aria-expanded", "false");
+  panel.inert = true;
+  setHeight(panel, "0px");
+  if (hasGsap) setTimeout(() => ScrollTrigger.refresh(), 600);
+}
+
+function tease(li, on) {
+  if (li.classList.contains("open")) return;
+  li.classList.toggle("teasing", on);
+  setHeight(panelOf(li), on ? teaseHeight() + "px" : "0px");
+}
+
+$$("#toc > li").forEach(li => {
+  $(".toc-row", li).addEventListener("click", () => {
+    if (li.classList.contains("open")) return closeItem(li);
+    $$("#toc > li.open").forEach(closeItem);
+    openItem(li);
   });
-  let x = 0, y = 0, px = 0, py = 0;
-  document.addEventListener("mousemove", e => { x = e.clientX; y = e.clientY; });
-  (function follow() {
-    px += (x - px) * 0.16;
-    py += (y - py) * 0.16;
-    peek.style.transform = `translate(${px + 28}px, ${py - 110}px) rotate(${Math.max(-7, Math.min(7, (x - px) * 0.1))}deg)`;
-    requestAnimationFrame(follow);
-  })();
+  if (fine) {
+    li.addEventListener("mouseenter", () => tease(li, true));
+    li.addEventListener("mouseleave", () => tease(li, false));
+  }
+});
+
+if (!reduce) {
+  const demo = new IntersectionObserver(entries => {
+    if (!entries[0].isIntersecting) return;
+    demo.disconnect();
+    const li = $$("#toc > li").find(x => !x.classList.contains("open"));
+    if (!li) return;
+    setTimeout(() => { if (!li.matches(":hover")) tease(li, true); }, 700);
+    setTimeout(() => { if (!li.matches(":hover")) tease(li, false); }, 2300);
+  }, { threshold: 0.6 });
+  demo.observe($("#toc > li:nth-child(2)"));
 }
 
 if (fine && !reduce) {
@@ -206,7 +236,6 @@ if (hasGsap && !reduce) {
 
   gsap.from("#toc > li", { y: 40, opacity: 0, duration: 0.7, stagger: 0.07, ease: "power3.out", scrollTrigger: { trigger: "#toc", start: "top 85%" } });
   gsap.from(".pack", { y: 70, opacity: 0, duration: 0.9, stagger: 0.12, ease: "power3.out", scrollTrigger: { trigger: ".pack-grid", start: "top 85%" } });
-  gsap.from(".hint-click", { y: 14, opacity: 0, duration: 0.6, scrollTrigger: { trigger: ".hint-click", start: "top 90%" } });
   gsap.from(".service", { y: 60, opacity: 0, rotate: 2, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".service-grid", start: "top 85%" } });
 
   gsap.fromTo(".steps-line path", { strokeDashoffset: 1000 }, { strokeDashoffset: 0, ease: "none", scrollTrigger: { trigger: ".steps-wrap", start: "top 75%", end: "bottom 55%", scrub: true } });
