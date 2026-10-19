@@ -1,1 +1,45 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f5f1"><title>Rota · Kellyson & Jeyce</title><link rel="stylesheet" href="style.css"></head><body><aside class="sidebar"><a class="brand" href="#inicio">rota<span>↗</span><small>KELLYSON & JEYCE</small></a><div class="workspace"><span class="workspace-mark">✳</span><div>Freelas Alto Oeste<small>Nosso espaço de trabalho</small></div></div><nav aria-label="Navegação principal"></nav><div class="sidebar-foot"><span class="demo-dot"></span> Modo demonstração<small>Dados de exemplo do Miro.<br>Alterações só neste navegador.</small><button class="reset-link" id="reset">Restaurar demonstração</button></div><div class="team"><span class="avatar">K</span><span class="avatar j">J</span><div>Kellyson & Jeyce<small>Dupla em atividade ✷</small></div></div></aside><main><header><span id="breadcrumb"></span><div class="top-tools"><span class="local-label">✳ Protótipo visual</span><label>Usando como <select id="actor"><option>Kellyson</option><option>Jeyce</option></select></label></div></header><div id="app"></div></main><dialog id="detail" class="drawer"><button class="close" aria-label="Fechar painel">×</button><div id="detail-content"></div></dialog><dialog id="form-dialog"><button class="close" aria-label="Fechar formulário">×</button><div id="form-content"></div></dialog><div id="toast" role="status"></div><script src="data.js"></script><script src="leads.js"></script><script src="app.js"></script><script src="selects.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3efe4">
+<title>Rota · Kellyson & Jeyce</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c6f432'/%3E%3Cpath d='M9 22 22 9M13 9h9v9' stroke='%2316150f' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#inicio" aria-label="Rota, início">rota<span>↗</span></a>
+  <p class="brand-sub">central de freelas da dupla</p>
+  <nav id="nav" aria-label="Navegação principal"></nav>
+  <div class="sidebar-foot" id="sidebar-foot"></div>
+</aside>
+<main>
+  <header class="topbar">
+    <div class="crumb" id="crumb"></div>
+    <div class="top-actions">
+      <button class="btn ghost small" id="quick-add-top" type="button">＋ Contato</button>
+      <div id="who"></div>
+    </div>
+  </header>
+  <div id="app" aria-live="polite"></div>
+</main>
+<nav class="tabbar" id="tabbar" aria-label="Navegação rápida"></nav>
+<dialog id="drawer" class="drawer"><button class="close" type="button" aria-label="Fechar">×</button><div id="drawer-content"></div></dialog>
+<dialog id="modal" class="modal"><button class="close" type="button" aria-label="Fechar">×</button><div id="modal-content"></div></dialog>
+<div id="toast" role="status"></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="leads.js"></script>
+<script src="data.js"></script>
+<script src="seed.js"></script>
+<script src="store.js"></script>
+<script src="app.js"></script>
+<script src="selects.js"></script>
+</body>
+</html>
