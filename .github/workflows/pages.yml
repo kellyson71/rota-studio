@@ -29,10 +29,13 @@ jobs:
           node --check selects.js
           node --check data.js
           node --check leads.js
+          node --check store.js
+          node --check seed.js
+          node --check config.js
       - name: Preparar site
         run: |
           mkdir -p dist
-          cp index.html style.css app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
+          cp index.html style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
           cp -R kit dist/kit
       - name: Configurar Pages
         uses: actions/configure-pages@v5
