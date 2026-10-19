@@ -1,0 +1,7 @@
+app-v1.archive.js
+scripts/
+dist/
+node_modules/
+.env
+.env.*
+.DS_Store
