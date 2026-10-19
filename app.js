@@ -1,641 +1,1269 @@
-const $ = s => document.querySelector(s), esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-}[c]));
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+const pad = n => String(n).padStart(2, "0");
+const now = () => new Date().toISOString();
+const localDay = d => { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
+const today = () => localDay(Date.now());
+const addDays = n => localDay(Date.now() + n * 864e5);
+const daysSince = iso => (iso ? Math.max(0, Math.floor((Date.now() - new Date(iso)) / 864e5)) : null);
+const pick = list => list[Math.floor(Math.random() * list.length)];
+const shortName = c => String(c.name || "Sem nome").split(" - ")[0];
+const initials = s => String(s || "?").replace(/[^\p{L}\p{N} ]/gu, "").split(" ").filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
+const tone = s => [...String(s)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 5;
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const read = (k, d) => {
-    try {
-        return JSON.parse(localStorage.getItem("rota-demo-" + k)) ?? d;
-    } catch {
-        return d;
-    }
-}, write = (k, v) => localStorage.setItem("rota-demo-" + k, JSON.stringify(v));
+const STATUS = {
+  "A enviar": { icon: "↗", tone: "new", label: "A enviar" },
+  "Aguardando resposta": { icon: "◷", tone: "wait", label: "No vácuo" },
+  "Respondeu": { icon: "↩", tone: "reply", label: "Respondeu" },
+  "Reunião marcada": { icon: "▦", tone: "reply", label: "Reunião marcada" },
+  "Interessado": { icon: "✦", tone: "win", label: "Interessado" },
+  "Proposta enviada": { icon: "▤", tone: "reply", label: "Proposta enviada" },
+  "Fechado": { icon: "✓", tone: "win", label: "Fechado" },
+  "Sem interesse": { icon: "−", tone: "no", label: "Sem interesse" },
+  "Mais tarde": { icon: "◴", tone: "new", label: "Mais tarde" }
+};
+const STATUSES = Object.keys(STATUS);
+const TALKING = ["Respondeu", "Reunião marcada", "Interessado", "Proposta enviada"];
+const TEAM = ["Kellyson", "Jeyce"];
+const TASK_STATES = ["A fazer", "Fazendo", "Em revisão", "Feito"];
+const STAGES = [
+  { id: "novos", label: "A enviar", icon: "↗", match: c => c.status === "A enviar", drop: "A enviar" },
+  { id: "vacuo", label: "No vácuo", icon: "◷", match: c => c.status === "Aguardando resposta", drop: "Aguardando resposta" },
+  { id: "conversa", label: "Conversando", icon: "↩", match: c => TALKING.includes(c.status), drop: "Respondeu" },
+  { id: "fechado", label: "Fechados", icon: "✓", match: c => c.status === "Fechado", drop: "Fechado" },
+  { id: "parado", label: "Parados", icon: "−", match: c => ["Sem interesse", "Mais tarde"].includes(c.status), drop: "Mais tarde" }
+];
+const QUALIFICATION = { "COMPENSA": ["vale a pena", "🔥", "hot"], "NAO COMPENSA": ["não compensa", "🙃", "cold"], "bleh, ate que vai": ["bleh, até que vai", "😐", "meh"] };
+const PRIORITY_RANK = { Urgente: 0, Alta: 1, Normal: 2, Baixa: 3 };
+const QUAL_RANK = { "COMPENSA": 0, "": 1, "bleh, ate que vai": 1, "NAO COMPENSA": 3 };
 
-const clone = x => JSON.parse(JSON.stringify(x));
-
-let leads = read("leads", clone(window.LEADS)), gov = read("gov", CONTACTS.map((c, i) => ({
-    id: "gov-" + i,
-    name: c.municipio + " · " + c.secretaria,
-    city: c.municipio,
-    category: c.secretaria,
-    kind: "government",
-    status: "Mais tarde",
-    owner: "",
-    priority: "Normal",
-    channel: c.whatsapp_oficial ? "WhatsApp" : "E-mail",
-    phone: c.whatsapp_oficial || "",
-    email: c.email_secretaria || c.email_prefeitura,
-    instagram: c.instagram,
-    telephone: c.telefone_secretaria || c.telefone_prefeitura,
-    website: c.site,
-    tip: c.sinais,
-    notes: "Prefeituras ficam para depois, conforme nota de vocês no Miro.",
-    message: `Olá! Somos Kellyson e Jeyce, desenvolvedores do Alto Oeste. Gostaríamos de conversar com a equipe de ${c.secretaria} sobre sistemas para facilitar o trabalho da secretaria. Qual seria o melhor contato?`,
-    source: "Kit · contatos_prefeituras.csv",
-    history: []
-})));
-
-let dashboardOwner = "Dupla";
-
-let projects = read("projects", []), actor = read("actor", "Kellyson"), activeTab = "Todos", search = "", ownerFilter = "Todos", channelFilter = "Todos", page = 1, projectTab = "Em andamento", messageMode = "message";
-
-const STATUSES = [ "A enviar", "Aguardando resposta", "Respondeu", "Reunião marcada", "Interessado", "Proposta enviada", "Fechado", "Sem interesse", "Mais tarde" ];
-
-const TASK_STATES = [ "A fazer", "Fazendo", "Em revisão", "Feito" ];
-
-const initials = s => s.split(" ").filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase();
-
-const all = () => [ ...leads, ...gov ];
-
-const byId = id => all().find(c => c.id === id);
-
-const route = () => location.hash.slice(1) || "inicio";
-
-const persist = () => {
-    write("leads", leads);
-    write("gov", gov);
-    write("projects", projects);
+const JOKES = {
+  sent: ["Mandado! Agora é fingir que não tá olhando o “visto por último” 👀", "Foi! Mensagem no ar ✈️", "Enviado. O universo (e o WhatsApp) agradecem.", "Mais uma porta batida 🚪", "Pronto. Agora é com o algoritmo divino 🙏"],
+  streak: ["5 seguidas! Tá voando 🚀", "Isso é prospecção ou maratona? 🏃", "Modo máquina ativado 🤖"],
+  closed: ["FECHOU! Pix na conta em breve 💸", "Contrato na mão. Pode comemorar (e depois entregar) 🎉", "É TETRA! Quer dizer… é cliente! 🏆"],
+  lost: ["Um não hoje, um case amanhã.", "Next! 🫡", "Tudo bem, a gente tem mais 80 portas."],
+  skip: ["Pulado. Volta no fim da fila.", "Esse fica pra depois 🫥"],
+  done: ["Fila zerada. Vai tomar um café ☕", "Acabou! Até o WhatsApp tá cansado.", "Nenhuma mensagem pendente. Isso é raro, tira um print."],
+  ticker: ["o vácuo não é um não", "follow-up educado > textão desesperado", "cliente bom é cliente que responde", "prospecção é 90% coragem e 10% Ctrl+V", "três “oi, sumido” não viram estratégia", "quem não é visto não é contratado", "o império começa com um follow-up", "orçamento sem prazo é só um sonho"]
 };
 
-const now = () => (new Date).toISOString();
+const TEMPLATES = [
+  { id: "message", label: "1º contato", stored: true },
+  { id: "followupMessage", label: "Retorno", stored: true },
+  { id: "meet", label: "Marcar conversa", text: "{oi}! Que bom que respondeu 🙂 Consigo te mostrar em 10 minutos, por vídeo ou aí pessoalmente. Qual dia e horário ficam melhor essa semana?" },
+  { id: "after", label: "Pós-conversa", text: "{oi}! Obrigado pela conversa. Como combinamos, vou montar a proposta e te mando até {prazo}. Qualquer dúvida, é só chamar aqui. {eu}" },
+  { id: "proposal", label: "Proposta", text: "{oi}! Segue a proposta que conversamos: {preco}. Inclui a implantação, os ajustes iniciais e o suporte. Se fizer sentido, a gente já combina o início. Ficou alguma dúvida?" },
+  { id: "nudge", label: "Cutucar proposta", text: "{oi}! Conseguiu dar uma olhada na proposta? Se quiser, ajusto o escopo para caber melhor no momento de vocês." }
+];
+const DEFAULT_MESSAGE = "Oi, tudo bem? Sou {eu}, desenvolvedor(a) aqui do Alto Oeste. Faço sites e sistemas para facilitar o dia a dia de negócios da região. Posso te mostrar em 10 minutos como funcionaria para vocês?";
+const DEFAULT_FOLLOWUP = "Oi! Passando só para saber se viu minha mensagem. Se não for o momento, sem problema. Obrigado!";
 
-const fmt = d => d ? new Date(d).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit"
-}) : "Data não registrada";
+const ui = {
+  kind: "private",
+  search: "",
+  stage: "todos",
+  owner: "Todos",
+  category: "Todos",
+  view: Store.local.read("view", "lista"),
+  limit: 30,
+  turbo: { mode: "novos", owner: "meus", category: "Todos", queue: [], index: 0, sent: 0, built: false, anim: "" },
+  projectTab: "Em andamento",
+  openProject: Store.local.read("open-project", null),
+  pendingRender: false,
+  drawerId: null,
+  drawerTemplate: "message",
+  drawerDraft: null
+};
 
-const options = (vals, chosen) => vals.map(v => `<option value="${esc(v)}" ${v === chosen ? "selected" : ""}>${esc(v || "Sem responsável")}</option>`).join("");
-
-const statusClass = s => s === "Aguardando resposta" ? "status-wait" : [ "Respondeu", "Reunião marcada", "Proposta enviada" ].includes(s) ? "status-reply" : [ "Interessado", "Fechado" ].includes(s) ? "status-win" : s === "Sem interesse" ? "status-no" : "status-new";
-
-let toastTimer;
-
-function toast(t) {
-    clearTimeout(toastTimer);
-    $("#toast").textContent = t;
-    $("#toast").classList.add("show");
-    toastTimer = setTimeout(() => $("#toast").classList.remove("show"), 3200);
+function actor() {
+  if (Store.mode === "cloud") return Store.member?.name || Store.user?.email || "Alguém";
+  return Store.local.read("actor", "Kellyson");
 }
 
-function log(c, text) {
-    c.history = c.history || [];
-    c.history.unshift({
-        text: text,
-        actor: actor,
-        at: now()
-    });
+const route = () => (location.hash.slice(1) || "inicio").split("?")[0];
+const contactsOf = kind => Store.contacts.filter(c => (c.kind || "private") === kind);
+const byId = id => Store.contacts.find(c => c.id === id);
+const projectById = id => Store.projects.find(p => p.id === id);
+const ownerLabel = o => o || "Ninguém";
+
+function log(c, text, type = "note") {
+  c.history = [{ text, type, actor: actor(), at: now() }, ...(c.history || [])].slice(0, 80);
+}
+
+function snapshot(c) {
+  return JSON.parse(JSON.stringify(c));
+}
+
+function restore(c, snap) {
+  Object.keys(c).forEach(k => { if (!(k in snap)) delete c[k]; });
+  Object.assign(c, snap);
+  Store.saveContact(c);
 }
 
 function setStatus(c, status) {
-    if (c.status !== status) {
-        log(c, `Status: ${c.status} → ${status}`);
-        c.status = status;
-        if ([ "Respondeu", "Reunião marcada", "Interessado", "Sem interesse" ].includes(status) && !c.respondedAt) c.respondedAt = now();
-        persist();
-    }
-    render();
+  if (!c || c.status === status) return;
+  const snap = snapshot(c);
+  const from = c.status;
+  c.status = status;
+  if (TALKING.includes(status) && !c.respondedAt) c.respondedAt = now();
+  log(c, `${STATUS[from]?.label || from} → ${STATUS[status]?.label || status}`, "status");
+  Store.saveContact(c);
+  const undo = () => restore(c, snap);
+  if (status === "Fechado") {
+    confetti();
+    toast(pick(JOKES.closed), undo);
+  } else if (status === "Sem interesse") {
+    toast(pick(JOKES.lost), undo);
+  } else {
+    toast(`${shortName(c)} → ${STATUS[status].label}`, undo);
+  }
 }
 
-function markSent(c) {
-    c.sentAt = now();
-    c.owner = c.owner || actor;
-    c.status = "Aguardando resposta";
-    log(c, "Envio marcado manualmente");
-    persist();
-    render();
-    toast("Envio registrado. Na fila de respostas ✓");
+function setOwner(c, owner) {
+  if (!c || (c.owner || "") === owner) return;
+  c.owner = owner;
+  log(c, owner ? `Agora quem cuida é ${owner}` : "Ficou sem responsável", "owner");
+  Store.saveContact(c);
 }
 
-function saveField(c, key, value) {
-    c[key] = value;
-    persist();
+function markSent(c, mode = "message", { quiet = false } = {}) {
+  if (!c) return;
+  const snap = snapshot(c);
+  const followup = mode !== "message";
+  c.status = "Aguardando resposta";
+  c.sentAt = now();
+  c.owner = c.owner || actor();
+  c.returnAt = addDays(followup ? 5 : 3);
+  if (followup) c.followups = (c.followups || 0) + 1;
+  log(c, followup ? "Mandou um retorno" : "Mandou a primeira mensagem", "sent");
+  Store.saveContact(c);
+  if (!quiet) toast(pick(JOKES.sent) + ` Retorno em ${relDay(c.returnAt)}.`, () => restore(c, snap));
+  return snap;
 }
 
-const safeUrl = u => {
-    try {
-        const p = new URL(u);
-        return [ "http:", "https:" ].includes(p.protocol) ? p.href : "";
-    } catch {
-        return "";
-    }
-};
+function logReply(c, text) {
+  const snap = snapshot(c);
+  if (!TALKING.includes(c.status) && c.status !== "Fechado") c.status = "Respondeu";
+  c.respondedAt = c.respondedAt || now();
+  c.returnAt = "";
+  log(c, text ? `Resposta: “${text}”` : "Respondeu", "reply");
+  Store.saveContact(c);
+  toast("Resposta registrada. A bola tá com vocês ⚽", () => restore(c, snap));
+}
 
-function channels(c, msg = c.message) {
-    const result = [];
-    const digits = (c.phone || "").replace(/\D/g, "");
-    if (digits.length >= 10) result.push({
-        name: "WhatsApp",
-        url: `https://wa.me/${digits.startsWith("55") ? digits : "55" + digits}?text=${encodeURIComponent(msg || "")}`
+function fmtDay(ymd) {
+  return ymd ? new Date(ymd + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "") : "";
+}
+
+function fmtWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" }).replace(/\./g, "") + " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function relDay(ymd) {
+  if (!ymd) return "";
+  const diff = Math.round((new Date(ymd + "T12:00:00") - new Date(today() + "T12:00:00")) / 864e5);
+  if (diff === 0) return "hoje";
+  if (diff === 1) return "amanhã";
+  if (diff === -1) return "ontem";
+  if (diff < 0) return `há ${-diff} dias`;
+  if (diff < 7) return `em ${diff} dias`;
+  return fmtDay(ymd);
+}
+
+function ago(iso) {
+  const d = daysSince(iso);
+  if (d === null) return "";
+  if (d === 0) {
+    const h = Math.floor((Date.now() - new Date(iso)) / 36e5);
+    return h < 1 ? "agora há pouco" : `há ${h}h`;
+  }
+  return d === 1 ? "ontem" : `há ${d} dias`;
+}
+
+function vacuum(c) {
+  const d = daysSince(c.sentAt);
+  if (d === null) return { label: "envio sem data", cls: "muted" };
+  if (d === 0) return { label: "mandado hoje", cls: "fresh" };
+  if (d < 3) return { label: `${d}d · fresquinho`, cls: "fresh" };
+  if (d < 7) return { label: `${d}d de vácuo 🥲`, cls: "warm" };
+  return { label: `${d}d · vácuo raiz 💀`, cls: "cold" };
+}
+
+function isDue(c) {
+  return c.status === "Aguardando resposta" && (!c.returnAt || c.returnAt <= today());
+}
+
+function sentTodayBy(who) {
+  const day = today();
+  return Store.contacts.reduce((n, c) => n + (c.history || []).filter(h => h.type === "sent" && localDay(h.at) === day && (!who || h.actor === who)).length, 0);
+}
+
+const safeUrl = u => { try { const p = new URL(u); return ["http:", "https:"].includes(p.protocol) ? p.href : ""; } catch { return ""; } };
+
+function channels(c, text = "") {
+  const list = [];
+  const digits = String(c.phone || "").replace(/\D/g, "");
+  if (digits.length >= 10) list.push({ name: "WhatsApp", icon: "◉", url: `https://wa.me/${digits.startsWith("55") ? digits : "55" + digits}${text ? "?text=" + encodeURIComponent(text) : ""}`, prefill: true });
+  if (c.instagram) {
+    const ig = c.instagram.startsWith("http") ? safeUrl(c.instagram) : "https://www.instagram.com/" + encodeURIComponent(c.instagram.replace(/^@/, "").replace(/'/g, "")) + "/";
+    if (ig) list.push({ name: "Instagram", icon: "◎", url: ig });
+  }
+  if (c.email && c.email.includes("@")) list.push({ name: "E-mail", icon: "✉", url: `mailto:${c.email}?subject=${encodeURIComponent(c.subject || "")}&body=${encodeURIComponent(text)}`, prefill: true });
+  if (c.website && safeUrl(c.website)) list.push({ name: "Site", icon: "↗", url: safeUrl(c.website) });
+  if (c.telephone) list.push({ name: "Telefone", icon: "☎", url: "tel:" + c.telephone.replace(/[^+\d]/g, "") });
+  if (!list.length && safeUrl(c.channelUrl)) list.push({ name: c.channel || "Link", icon: "↗", url: safeUrl(c.channelUrl) });
+  const primary = c.channel === "Fixo" ? "Telefone" : c.channel;
+  return list.sort((a, b) => (b.name === primary) - (a.name === primary));
+}
+
+function fillTemplate(text, c) {
+  const person = String(c.person || "").split(/[ (]/)[0];
+  return String(text || "")
+    .replaceAll("{oi}", person ? `Oi, ${person}` : "Oi")
+    .replaceAll("{nome}", person || shortName(c))
+    .replaceAll("{empresa}", shortName(c))
+    .replaceAll("{eu}", actor())
+    .replaceAll("{cidade}", c.city || "região")
+    .replaceAll("{preco}", c.price || "[valor]")
+    .replaceAll("{prazo}", fmtDay(addDays(3)));
+}
+
+function messageFor(c, mode = "message") {
+  if (mode === "message") return fillTemplate(c.message || DEFAULT_MESSAGE, c);
+  if (mode === "followupMessage") return fillTemplate(c.followupMessage || DEFAULT_FOLLOWUP, c);
+  return fillTemplate(TEMPLATES.find(t => t.id === mode)?.text || "", c);
+}
+
+async function copy(text, label = "Copiado") {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const t = document.createElement("textarea");
+    t.value = text;
+    t.style.position = "fixed";
+    t.style.opacity = "0";
+    document.body.append(t);
+    t.select();
+    const ok = document.execCommand("copy");
+    t.remove();
+    if (!ok) return toast("Não consegui copiar. Selecione o texto e use Ctrl+C."), false;
+  }
+  toast(label + " ✓");
+  return true;
+}
+
+function copyAndOpen(c, text, channelName) {
+  const list = channels(c, text);
+  const target = list.find(x => !channelName || x.name === channelName) || list[0];
+  if (!target) {
+    openDrawer(c.id);
+    return toast("Esse contato ainda não tem canal. Edite a ficha e adicione um.");
+  }
+  window.open(target.url, "_blank", "noopener,noreferrer");
+  copy(text, target.prefill ? `Abri o ${target.name} com a mensagem pronta` : `Mensagem copiada, é só colar no ${target.name}`);
+}
+
+let toastTimer;
+function toast(text, undo) {
+  const el = $("#toast");
+  clearTimeout(toastTimer);
+  el.innerHTML = `<span>${esc(text)}</span>${undo ? '<button type="button">Desfazer</button>' : ""}`;
+  if (undo) $("button", el).onclick = () => { undo(); el.classList.remove("show"); toast("Desfeito ↺"); };
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+  toastTimer = setTimeout(() => el.classList.remove("show"), undo ? 6000 : 3200);
+}
+
+function confetti() {
+  if (reduceMotion()) return;
+  const canvas = $("#confetti");
+  const ctx = canvas.getContext("2d");
+  canvas.width = innerWidth * devicePixelRatio;
+  canvas.height = innerHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const colors = ["#c6f432", "#b9a4ff", "#ff8a4c", "#ff7eb6", "#16150f", "#5fd1ff"];
+  const parts = Array.from({ length: 160 }, () => ({ x: innerWidth / 2, y: innerHeight * 0.4, vx: (Math.random() - 0.5) * 16, vy: Math.random() * -15 - 4, s: Math.random() * 7 + 4, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, c: pick(colors) }));
+  const start = performance.now();
+  (function frame(t) {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    parts.forEach(p => {
+      p.vy += 0.42;
+      p.vx *= 0.99;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.r += p.vr;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r);
+      ctx.fillStyle = p.c;
+      ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+      ctx.restore();
     });
-    if (c.instagram) {
-        let u = c.instagram.startsWith("http") ? safeUrl(c.instagram) : "https://www.instagram.com/" + encodeURIComponent(c.instagram.replace(/^@/, "")) + "/";
-        if (u) result.push({
-            name: "Instagram",
-            url: u
-        });
-    }
-    if (c.email && c.email.includes("@")) result.push({
-        name: "E-mail",
-        url: `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent(c.subject || "")}&body=${encodeURIComponent(msg || "")}`
-    });
-    if (c.website && safeUrl(c.website)) result.push({
-        name: "Site",
-        url: safeUrl(c.website)
-    });
-    if (c.telephone) result.push({
-        name: "Telefone",
-        url: "tel:" + c.telephone.replace(/[^+\d]/g, "")
-    });
-    if (!result.length && safeUrl(c.channelUrl)) result.push({
-        name: c.channel || "Site",
-        url: safeUrl(c.channelUrl)
-    });
-    return result.sort((a, b) => (b.name === c.channel) - (a.name === c.channel));
+    if (t - start < 2600) requestAnimationFrame(frame);
+    else ctx.clearRect(0, 0, innerWidth, innerHeight);
+  })(start);
 }
 
-async function copyMessage(c, mode = "message") {
-    const text = c[mode] || c.message || "";
-    try {
-        await navigator.clipboard.writeText(text);
-        toast("Mensagem copiada. Pode colar no canal ↗");
-        return true;
-    } catch {
-        toast("Cópia indisponível. Selecione a mensagem no painel.");
-        return false;
-    }
+const opts = (values, chosen, label = v => v) => values.map(v => `<option value="${esc(v)}" ${v === chosen ? "selected" : ""}>${esc(label(v))}</option>`).join("");
+const statusPill = s => `<span class="pill tone-${STATUS[s]?.tone || "new"}"><b>${STATUS[s]?.icon || "•"}</b>${esc(STATUS[s]?.label || s)}</span>`;
+const avatar = (name, cls = "") => `<span class="avatar t${tone(name)} ${cls}">${esc(initials(name))}</span>`;
+const personDot = who => who ? `<span class="person p-${esc(who.toLowerCase())}">${esc(who[0])}</span>` : '<span class="person p-none">?</span>';
+
+function qualBadge(c) {
+  const q = QUALIFICATION[c.qualification];
+  return q ? `<span class="sticker s-${q[2]}">${q[1]} ${q[0]}</span>` : "";
 }
 
-function copyOpen(c, mode = "message", channelName) {
-    const link = channels(c, c[mode] || c.message).find(x => !channelName || x.name === channelName);
-    if (!link) {
-        openContact(c.id);
-        toast("Adicione um canal na ficha do contato.");
-        return;
-    }
-    window.open(link.url, "_blank", "noopener,noreferrer");
-    copyMessage(c, mode);
+const NAV = [
+  { id: "inicio", icon: "◈", label: "Hoje" },
+  { id: "turbo", icon: "⚡", label: "Modo turbo", badge: () => contactsOf("private").filter(c => c.status === "A enviar").length },
+  { id: "contatos", icon: "☷", label: "Contatos", badge: () => contactsOf("private").filter(c => TALKING.includes(c.status)).length, badgeHot: true },
+  { id: "projetos", icon: "▦", label: "Projetos", badge: () => Store.projects.filter(p => p.status !== "Entregue").length },
+  { id: "prefeituras", icon: "⌂", label: "Prefeituras", later: true },
+  { id: "materiais", icon: "▤", label: "Materiais", later: true }
+];
+
+function renderChrome() {
+  const r = route();
+  const item = n => {
+    const b = n.badge?.();
+    return `<a href="#${n.id}" class="${r === n.id ? "active" : ""}" ${r === n.id ? 'aria-current="page"' : ""}><b>${n.icon}</b><span>${n.label}</span>${b ? `<small class="${n.badgeHot ? "hot" : ""}">${b}</small>` : ""}</a>`;
+  };
+  $("#nav").innerHTML = NAV.filter(n => !n.later).map(item).join("") + '<div class="nav-sep">pra depois</div>' + NAV.filter(n => n.later).map(item).join("");
+  $("#tabbar").innerHTML = NAV.slice(0, 4).map(item).join("") + `<a href="#materiais" class="${["materiais", "prefeituras"].includes(r) ? "active" : ""}"><b>⋯</b><span>Mais</span></a>`;
+  $("#crumb").innerHTML = `<span>Freelas Alto Oeste</span> / <strong>${esc(NAV.find(n => n.id === r)?.label || "Hoje")}</strong>`;
+  const me = actor();
+  if (Store.mode === "cloud") {
+    $("#who").innerHTML = Store.member ? `<span class="who">${personDot(me)}<span>${esc(me)}</span></span>` : "";
+    $("#sidebar-foot").innerHTML = Store.member ? `<div class="sync"><span class="live"></span>Sincronizado com a dupla</div><button class="link" data-action="sign-out" type="button">Sair da conta</button>` : "";
+  } else {
+    $("#who").innerHTML = `<label class="who">${personDot(me)}<span class="sr-only">Usando como</span><select id="actor" aria-label="Usando como">${opts(TEAM, me)}</select></label>`;
+    $("#sidebar-foot").innerHTML = `<div class="sync demo"><span class="live"></span>Modo demonstração</div><p>Tudo fica salvo só neste navegador até o Supabase ser ligado.</p><button class="link" data-action="reset-demo" type="button">Restaurar dados de exemplo</button>`;
+  }
+  $("#quick-add-top").hidden = Store.mode === "cloud" && !Store.member;
 }
 
-const head = (title, desc, action = "") => `<section class="page-head"><div><span class="eyebrow">KELLYSON & JEYCE / NOSSO DIA A DIA</span><h1>${title}</h1><p>${desc}</p></div>${action}</section>`;
-
-function nav() {
-    const r = route();
-    $("nav").innerHTML = `<a href="#inicio" class="${r === "inicio" ? "active" : ""}"><b>◈</b>Início</a><a href="#contatos" class="${r === "contatos" ? "active" : ""}"><b>☷</b>Contatos <small>${leads.length}</small></a><a href="#retornos" class="${r === "retornos" ? "active" : ""}"><b>↶</b>Sem resposta <small>${leads.filter(c => c.status === "Aguardando resposta").length}</small></a><a href="#projetos" class="${r === "projetos" ? "active" : ""}"><b>▦</b>Projetos <small>${projects.length}</small></a><div class="nav-separator">GUARDADO POR AQUI</div><a href="#governo" class="${r === "governo" ? "active" : ""}"><b>⌂</b>Prefeituras <small>depois</small></a><a href="#biblioteca" class="${r === "biblioteca" ? "active" : ""}"><b>▤</b>Materiais</a>`;
-    $("#actor").value = actor;
-    $("#breadcrumb").textContent = "Freelas Alto Oeste / " + ({
-        contatos: "Contatos",
-        inicio: "Início",
-        retornos: "Sem resposta",
-        projetos: "Projetos",
-        governo: "Prefeituras",
-        biblioteca: "Materiais"
-    }[r] || "Contatos");
+function pageHead(kicker, title, sub, actions = "") {
+  return `<section class="page-head"><div><span class="kicker">${kicker}</span><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ""}</div>${actions ? `<div class="head-actions">${actions}</div>` : ""}</section>`;
 }
 
-const count = s => leads.filter(c => Array.isArray(s) ? s.includes(c.status) : c.status === s).length;
-
-function metrics() {
-    return `<section class="summary">${[ [ "A enviar", "A enviar", "Ainda para conversar", "↗" ], [ "Aguardando resposta", "Sem resposta", "Na espera do “oi”", "◷" ], [ [ "Respondeu", "Reunião marcada", "Interessado", "Proposta enviada", "Fechado", "Sem interesse" ], "Responderam", "Conversa que andou", "↩" ], [ "Reunião marcada", "Reunião marcada", "Bora conversar de verdade", "✳" ], [ "Fechado", "Fechados", "Agora é entregar", "✓" ] ].map(([s, t, caption, icon]) => `<button data-metric="${Array.isArray(s) ? "Responderam" : s}"><span class="metric-title">${t}</span><span class="metric-icon">${icon}</span><strong class="metric-value">${String(count(s)).padStart(2, "0")}</strong><span class="metric-caption">${caption}</span></button>`).join("")}</section>`;
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? "Boa madrugada (vai dormir)" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
 }
 
-function matches(c, tab) {
-    return tab === "Todos" || tab === "Responderam" && [ "Respondeu", "Reunião marcada", "Interessado", "Proposta enviada", "Fechado", "Sem interesse" ].includes(c.status) || c.status === tab;
+function homePage() {
+  const me = actor();
+  const priv = contactsOf("private");
+  const toSend = priv.filter(c => c.status === "A enviar");
+  const waiting = priv.filter(c => c.status === "Aguardando resposta").sort((a, b) => String(a.sentAt || "").localeCompare(String(b.sentAt || "")));
+  const due = waiting.filter(isDue);
+  const talking = priv.filter(c => TALKING.includes(c.status)).sort((a, b) => TALKING.indexOf(b.status) - TALKING.indexOf(a.status));
+  const meetings = priv.filter(c => c.meetingAt && c.meetingAt.slice(0, 10) >= today()).sort((a, b) => a.meetingAt.localeCompare(b.meetingAt));
+  const goal = Number(Store.local.read("goal", 5));
+  const mine = sentTodayBy(me);
+  const pct = Math.min(100, Math.round((mine / goal) * 100));
+  const feed = Store.contacts.flatMap(c => (c.history || []).map(h => ({ ...h, id: c.id, name: shortName(c) }))).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 7);
+  const active = Store.projects.filter(p => p.status !== "Entregue");
+  const ticker = [...JOKES.ticker, ...JOKES.ticker].map(t => `<span>✳ ${esc(t)}</span>`).join("");
+  const mood = mine >= goal ? "Missão cumprida. Pode até abrir o Instagram sem culpa 😎" : mine ? `Faltam ${goal - mine}. Tá indo bem, não para agora.` : toSend.length ? "Nenhuma mensagem hoje ainda. O primeiro “oi” é o mais difícil." : "Fila vazia. Hora de caçar contatos novos.";
+
+  return `
+  <section class="hero rise" style="--i:0">
+    <div class="hero-copy">
+      <span class="kicker">${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</span>
+      <h1>${greeting()}, <span class="hl">${esc(me)}</span>.</h1>
+      <p>${esc(mood)}</p>
+      <div class="mission">
+        <div class="mission-top"><span>Missão do dia</span><button class="link" data-action="goal" type="button">meta: ${goal} msgs ✎</button></div>
+        <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${mine}" aria-label="Mensagens enviadas hoje"><div style="width:${pct}%"></div><span class="meter-emoji" style="left:${pct}%">${mine >= goal ? "🏆" : "🏃"}</span></div>
+        <div class="mission-foot"><strong>${mine}/${goal}</strong> mandadas por você hoje · ${sentTodayBy()} pela dupla</div>
+      </div>
+      <div class="hero-actions">
+        <a class="btn primary big" href="#turbo" data-action="turbo-mode" data-mode="novos">⚡ Modo turbo <small>${toSend.length} na fila</small></a>
+        <a class="btn big" href="#turbo" data-action="turbo-mode" data-mode="retornos">↶ Retornos <small>${due.length} vencidos</small></a>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="phone">
+        <div class="phone-top"><span class="avatar t2">CL</span><div><strong>Cliente dos sonhos</strong><small>visto por último hoje às 09:41</small></div></div>
+        <div class="bubble me b1">Oi, tudo bem? Posso te mostrar em 10 min? 🙂<i>✓✓</i></div>
+        <div class="bubble them b2"><span class="typing"><i></i><i></i><i></i></span></div>
+        <div class="bubble them b3">opa, pode sim! quanto fica?</div>
+      </div>
+      <span class="float-sticker f1">visualizou 👀</span>
+      <span class="float-sticker f2">R$ ✦ em breve</span>
+    </div>
+  </section>
+  <div class="ticker rise" style="--i:1" aria-hidden="true"><div>${ticker}</div></div>
+  <section class="funnel rise" style="--i:2" aria-label="Funil">
+    ${STAGES.map(s => { const n = priv.filter(s.match).length; return `<a href="#contatos" data-action="stage" data-stage="${s.id}" class="stage st-${s.id}"><span class="stage-icon">${s.icon}</span><strong>${pad(n)}</strong><span>${s.label}</span><i style="--w:${priv.length ? Math.max(4, (n / priv.length) * 100) : 0}%"></i></a>`; }).join("")}
+  </section>
+  <div class="home-grid">
+    <section class="panel rise hot-panel" style="--i:3">
+      <header><div><span class="kicker">a bola tá com vocês</span><h2>Responderam <em>${talking.length}</em></h2></div><a class="link" href="#contatos" data-action="stage" data-stage="conversa">ver todos</a></header>
+      ${talking.length ? talking.slice(0, 5).map(c => `
+        <div class="line">
+          ${avatar(shortName(c))}
+          <button class="line-main" data-action="open" data-id="${c.id}" type="button"><strong>${esc(shortName(c))}</strong><small>${statusPill(c.status)} ${c.meetingAt ? "· " + esc(fmtWhen(c.meetingAt)) : ""}</small></button>
+          ${personDot(c.owner)}
+          <button class="btn small" data-action="open" data-id="${c.id}" data-template="${c.status === "Respondeu" ? "meet" : c.status === "Reunião marcada" ? "after" : c.status === "Proposta enviada" ? "nudge" : "proposal"}" type="button">Responder ↗</button>
+        </div>`).join("") : `<div class="empty-mini"><b>🦗</b><p>Ninguém respondeu ainda. Normal. Bora encher a fila de mensagens.</p></div>`}
+    </section>
+    <section class="panel rise" style="--i:4">
+      <header><div><span class="kicker">hora do follow-up educado</span><h2>No vácuo <em>${waiting.length}</em></h2></div><a class="link" href="#turbo" data-action="turbo-mode" data-mode="retornos">cutucar em série</a></header>
+      ${waiting.length ? waiting.slice(0, 5).map(c => { const v = vacuum(c); return `
+        <div class="line">
+          ${avatar(shortName(c))}
+          <button class="line-main" data-action="open" data-id="${c.id}" type="button"><strong>${esc(shortName(c))}</strong><small><span class="vac v-${v.cls}">${esc(v.label)}</span>${c.returnAt ? ` · retorno ${esc(relDay(c.returnAt))}` : ""}</small></button>
+          <button class="icon-btn" data-action="go" data-id="${c.id}" data-mode="followupMessage" type="button" title="Copiar retorno e abrir canal" aria-label="Cutucar ${esc(shortName(c))}">↗</button>
+          <button class="icon-btn ok" data-action="sent" data-id="${c.id}" data-mode="followupMessage" type="button" title="Já mandei o retorno" aria-label="Marcar retorno enviado para ${esc(shortName(c))}">✓</button>
+        </div>`; }).join("") : `<div class="empty-mini"><b>🧘</b><p>Ninguém te deixando no vácuo. Paz interior desbloqueada.</p></div>`}
+    </section>
+    <section class="panel rise" style="--i:5">
+      <header><div><span class="kicker">agenda</span><h2>Conversas marcadas</h2></div></header>
+      ${meetings.length ? meetings.slice(0, 4).map(c => `
+        <button class="agenda" data-action="open" data-id="${c.id}" type="button"><span class="date-chip"><b>${new Date(c.meetingAt).getDate()}</b>${new Date(c.meetingAt).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")}</span><span><strong>${esc(shortName(c))}</strong><small>${esc(fmtWhen(c.meetingAt))} · ${esc(ownerLabel(c.owner))}</small></span></button>`).join("") : talking.some(c => c.status === "Reunião marcada") ? `<div class="empty-mini"><b>📅</b><p>Tem reunião marcada sem data registrada. Abra a ficha e anote o dia.</p><button class="btn small" data-action="open" data-id="${talking.find(c => c.status === "Reunião marcada").id}" type="button">Anotar data</button></div>` : `<div class="empty-mini"><b>📅</b><p>Quando marcarem uma conversa, ela aparece aqui.</p></div>`}
+    </section>
+    <section class="panel rise" style="--i:6">
+      <header><div><span class="kicker">da conversa à entrega</span><h2>Projetos <em>${active.length}</em></h2></div><a class="link" href="#projetos">abrir</a></header>
+      ${active.length ? active.slice(0, 4).map(p => { const done = p.tasks.filter(t => t.status === "Feito").length; return `<a class="line" href="#projetos" data-action="open-project" data-id="${p.id}">${avatar(p.name)}<span class="line-main"><strong>${esc(p.name)}</strong><small>${done}/${p.tasks.length} tarefas · ${esc(p.owner || "Dupla")}</small></span><span class="mini-bar"><i style="width:${p.tasks.length ? (done / p.tasks.length) * 100 : 0}%"></i></span></a>`; }).join("") : `<div class="empty-mini"><b>🛠️</b><p>Fechou um cliente? Crie o projeto pela ficha do contato.</p><button class="btn small" data-action="new-project" type="button">＋ Projeto</button></div>`}
+    </section>
+  </div>
+  <section class="panel feed rise" style="--i:7">
+    <header><div><span class="kicker">últimas movimentações</span><h2>O que a dupla andou fazendo</h2></div></header>
+    ${feed.length ? `<ol>${feed.map(h => `<li><button data-action="open" data-id="${h.id}" type="button">${personDot(h.actor)}<span><strong>${esc(h.actor)}</strong> ${esc(h.text.charAt(0).toLowerCase() + h.text.slice(1))} · <em>${esc(h.name)}</em></span><small>${esc(ago(h.at))}</small></button></li>`).join("")}</ol>` : '<div class="empty-mini"><b>📭</b><p>Nada por aqui ainda. Mande a primeira mensagem e ela aparece nesse mural.</p></div>'}
+  </section>`;
 }
 
-function source() {
-    return route() === "governo" ? gov : leads;
+function turboList() {
+  const t = ui.turbo;
+  const me = actor();
+  let list = contactsOf("private").filter(c => (t.mode === "novos" ? c.status === "A enviar" : c.status === "Aguardando resposta"));
+  if (t.owner === "meus") list = list.filter(c => !c.owner || c.owner === me);
+  if (t.category !== "Todos") list = list.filter(c => c.category === t.category);
+  if (t.mode === "novos") {
+    list.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2) || (QUAL_RANK[a.qualification || ""] ?? 1) - (QUAL_RANK[b.qualification || ""] ?? 1) || (a.order ?? 999) - (b.order ?? 999));
+  } else {
+    list.sort((a, b) => Number(isDue(b)) - Number(isDue(a)) || String(a.sentAt || "").localeCompare(String(b.sentAt || "")));
+  }
+  return list;
 }
 
-function filtered() {
-    return source().filter(c => matches(c, route() === "retornos" ? "Aguardando resposta" : activeTab) && (!search || [ c.name, c.category, c.city, c.notes ].join(" ").toLowerCase().includes(search.toLowerCase())) && (ownerFilter === "Todos" || (ownerFilter === "Sem responsável" ? !c.owner : c.owner === ownerFilter)) && (channelFilter === "Todos" || channels(c).some(x => x.name === channelFilter)));
+function buildQueue() {
+  const first = ui.turbo.first;
+  ui.turbo.first = null;
+  ui.turbo.queue = turboList().map(c => c.id);
+  if (first && ui.turbo.queue.includes(first)) ui.turbo.queue = [first, ...ui.turbo.queue.filter(x => x !== first)];
+  ui.turbo.index = 0;
+  ui.turbo.built = true;
+}
+
+function turboPage() {
+  const t = ui.turbo;
+  if (!t.built) buildQueue();
+  const mode = t.mode === "novos" ? "message" : "followupMessage";
+  const cats = [...new Set(contactsOf("private").filter(c => (t.mode === "novos" ? c.status === "A enviar" : c.status === "Aguardando resposta")).map(c => c.category).filter(Boolean))].sort();
+  const novos = contactsOf("private").filter(c => c.status === "A enviar").length;
+  const retornos = contactsOf("private").filter(c => c.status === "Aguardando resposta").length;
+  const c = byId(t.queue[t.index]);
+  const total = t.queue.length;
+  const head = `
+  <section class="turbo-head">
+    <div><span class="kicker">copiar · abrir · mandar · repetir</span><h1>Modo turbo <span class="bolt">⚡</span></h1></div>
+    <div class="turbo-controls">
+      <div class="seg" role="tablist" aria-label="Fila">
+        <button role="tab" aria-selected="${t.mode === "novos"}" class="${t.mode === "novos" ? "on" : ""}" data-action="turbo-mode" data-mode="novos" type="button">Primeiro contato <small>${novos}</small></button>
+        <button role="tab" aria-selected="${t.mode === "retornos"}" class="${t.mode === "retornos" ? "on" : ""}" data-action="turbo-mode" data-mode="retornos" type="button">Retornos <small>${retornos}</small></button>
+      </div>
+      <div class="seg small">
+        <button class="${t.owner === "meus" ? "on" : ""}" data-action="turbo-owner" data-owner="meus" type="button">Meus + sem dono</button>
+        <button class="${t.owner === "todos" ? "on" : ""}" data-action="turbo-owner" data-owner="todos" type="button">Todos</button>
+      </div>
+      <label class="filter">Tipo <select data-field="turbo-category" aria-label="Filtrar por tipo">${opts(["Todos", ...cats], t.category)}</select></label>
+    </div>
+  </section>`;
+  if (!c) {
+    return head + `<section class="turbo-done rise" style="--i:0"><div class="big-emoji">${t.sent ? "🏆" : "☕"}</div><h2>${esc(pick(JOKES.done))}</h2><p>${t.sent ? `Você mandou ${t.sent} nesta sessão. Agora é esperar o “digitando…”.` : "Nenhum contato nessa fila com esses filtros."}</p><div class="hero-actions"><button class="btn primary" data-action="quick-add" type="button">＋ Adicionar contatos</button><button class="btn" data-action="turbo-mode" data-mode="${t.mode === "novos" ? "retornos" : "novos"}" type="button">Ir para ${t.mode === "novos" ? "retornos" : "primeiro contato"}</button></div></section>`;
+  }
+  const text = messageFor(c, mode);
+  const ch = channels(c, text);
+  const v = vacuum(c);
+  const next = t.queue.slice(t.index + 1, t.index + 5).map(byId).filter(Boolean);
+  return head + `
+  <div class="turbo-stage">
+    <article class="turbo-card ${t.anim}" data-id="${c.id}">
+      <div class="turbo-progress"><span>${t.index + 1} de ${total}</span><div class="meter thin"><div style="width:${((t.index + 1) / total) * 100}%"></div></div><span>${t.sent} mandadas ✓</span></div>
+      <div class="turbo-tags"><span class="tag">${esc(c.category || "Sem tipo")}</span><span class="tag">${esc(c.city || "")}</span>${c.proposal ? `<span class="tag ink">${esc(c.proposal)}</span>` : ""}${qualBadge(c)}${t.mode === "retornos" ? `<span class="vac v-${v.cls}">${esc(v.label)}</span>` : ""}</div>
+      <h2><button data-action="open" data-id="${c.id}" type="button">${esc(c.name)}</button></h2>
+      <div class="turbo-meta">${personDot(c.owner)} ${c.owner ? `cuidado por ${esc(c.owner)}` : "sem dono ainda: quem mandar fica"} ${c.price ? `· <strong>${esc(c.price)}</strong>` : ""}</div>
+      ${c.tip ? `<div class="tip"><b>Antes de mandar</b>${esc(c.tip)}</div>` : ""}
+      ${c.notes ? `<div class="tip note"><b>Nota de vocês</b>${esc(c.notes)}</div>` : ""}
+      <label class="msg-label" for="turbo-msg">${t.mode === "novos" ? "Mensagem de primeiro contato" : "Mensagem de retorno"} <span>edite à vontade, salva sozinho</span></label>
+      <textarea id="turbo-msg" data-field="turbo-msg" data-id="${c.id}" data-mode="${mode}">${esc(text)}</textarea>
+      <div class="channel-row">${ch.map((x, i) => `<button class="chan ${i ? "" : "main"}" data-action="go" data-id="${c.id}" data-mode="${mode}" data-channel="${esc(x.name)}" data-from="turbo" type="button"><b>${x.icon}</b>${esc(x.name)}${i ? "" : ' <kbd>A</kbd>'}</button>`).join("") || '<span class="hint">Sem canal cadastrado. Abra a ficha para adicionar.</span>'}</div>
+      <div class="turbo-actions">
+        <button class="btn" data-action="copy" data-id="${c.id}" data-mode="${mode}" data-from="turbo" type="button">⧉ Copiar <kbd>C</kbd></button>
+        <button class="btn primary grow" data-action="turbo-sent" type="button">✓ Mandei, próximo <kbd>E</kbd></button>
+      </div>
+      <div class="turbo-secondary">
+        <button class="link" data-action="turbo-back" type="button" ${t.index ? "" : "disabled"}>← voltar</button>
+        <button class="link" data-action="turbo-skip" type="button">pular <kbd>→</kbd></button>
+        <button class="link" data-action="turbo-later" type="button">não compensa agora</button>
+        ${t.mode === "retornos" ? '<button class="link" data-action="turbo-replied" type="button">ele respondeu! 🎉</button>' : ""}
+      </div>
+    </article>
+    <aside class="turbo-side">
+      <div class="panel"><span class="kicker">próximos da fila</span>${next.length ? `<ol class="next-list">${next.map(n => `<li>${avatar(shortName(n))}<span><strong>${esc(shortName(n))}</strong><small>${esc(n.category || "")} · ${esc(n.city || "")}</small></span></li>`).join("")}</ol>` : '<p class="hint">Esse é o último. Força!</p>'}</div>
+      ${c.context ? `<div class="panel"><span class="kicker">o que se sabe</span><p class="small-text">${esc(c.context)}</p></div>` : ""}
+      <div class="panel keys"><span class="kicker">atalhos</span><p><kbd>C</kbd> copiar <kbd>A</kbd> abrir canal <kbd>E</kbd> mandei <kbd>→</kbd> pular <kbd>←</kbd> voltar</p></div>
+    </aside>
+  </div>`;
+}
+
+function turboAdvance(action) {
+  const t = ui.turbo;
+  const id = t.queue[t.index];
+  const c = byId(id);
+  if (action === "sent" && c) {
+    markSent(c, t.mode === "novos" ? "message" : "followupMessage", { quiet: true });
+    t.sent++;
+    t.index++;
+    toast(t.sent % 5 === 0 ? pick(JOKES.streak) : pick(JOKES.sent));
+  } else if (action === "skip") {
+    t.queue.splice(t.index, 1);
+    t.queue.push(id);
+    if (t.queue.length === 1) t.index = 0;
+    toast(pick(JOKES.skip));
+  } else if (action === "back") {
+    t.index = Math.max(0, t.index - 1);
+  } else if (action === "later" && c) {
+    const snap = snapshot(c);
+    c.status = "Mais tarde";
+    c.priority = "Baixa";
+    log(c, "Ficou pra depois (não compensa agora)", "status");
+    Store.saveContact(c, { silent: true });
+    t.queue.splice(t.index, 1);
+    toast("Foi pra geladeira 🧊", () => restore(c, snap));
+  } else if (action === "replied" && c) {
+    logReply(c, "");
+    t.queue.splice(t.index, 1);
+    openDrawer(c.id, "meet");
+  }
+  t.anim = action === "back" ? "from-left" : "from-right";
+  render();
+  t.anim = "";
+}
+
+function filteredContacts() {
+  const stage = STAGES.find(s => s.id === ui.stage);
+  const q = ui.search.trim().toLowerCase();
+  return contactsOf(ui.kind).filter(c =>
+    (!stage || stage.match(c)) &&
+    (ui.owner === "Todos" || (ui.owner === "Ninguém" ? !c.owner : c.owner === ui.owner)) &&
+    (ui.category === "Todos" || c.category === ui.category) &&
+    (!q || [c.name, c.category, c.city, c.notes, c.person, c.phone, c.instagram, c.email].join(" ").toLowerCase().includes(q))
+  );
 }
 
 function contactsPage() {
-    let g = route() === "governo", f = route() === "retornos";
-    return head(g ? "Prefeituras, para depois." : f ? "Quem ainda não respondeu." : "Conversas que viram projetos.", g ? "Contatos do kit, separados da rotina de prospecção." : f ? "Retome a conversa sem precisar caçar a última mensagem." : "Copiar, conversar, atualizar. Tudo no mesmo lugar.", `<button class="btn" id="new-contact">＋ Novo contato</button>`) + (g ? '<div class="page-note">Nota de vocês: retomar prefeituras depois de organizar o CNPJ. Pau dos Ferros fica fora da prospecção enquanto Kellyson for estagiário de lá.</div>' : metrics()) + `<div class="work-layout"><section class="contact-area"><div class="list-panel">${!f ? `<div class="filter-tabs">${[ "Todos", "A enviar", "Aguardando resposta", "Responderam", "Interessado", "Fechado", "Sem interesse" ].map(t => `<button data-tab="${t}" class="${activeTab === t ? "active" : ""}">${t === "Aguardando resposta" ? "Sem resposta" : t}<small>${source().filter(c => matches(c, t)).length}</small></button>`).join("")}</div>` : ""}<div class="search-row"><label class="search-box"><span>⌕</span><input id="search" aria-label="Buscar contato" placeholder="Buscar empresa, pessoa ou cidade…" value="${esc(search)}"></label><select id="owner-filter" aria-label="Filtrar responsável">${options([ "Todos", "Kellyson", "Jeyce", "Sem responsável" ], ownerFilter)}</select><select id="channel-filter" aria-label="Filtrar canal">${options([ "Todos", "WhatsApp", "Instagram", "E-mail", "Site", "Telefone" ], channelFilter)}</select></div><div class="table-scroll"><table><thead><tr><th>CONTATO</th><th>STATUS</th><th>QUEM CUIDA</th><th>AÇÕES</th></tr></thead><tbody id="rows"></tbody></table></div><div class="table-foot"><span id="result-count"></span><div class="bottom-tools"><button class="icon-btn" id="prev" aria-label="Página anterior">‹</button><button class="icon-btn" id="next" aria-label="Próxima página">›</button></div></div></div><div class="below-list"><span>⧉ copiar · ↗ copiar e abrir canal · ✓ marcar envio</span><span>Dados de demonstração</span></div></section><aside class="right-rail">${rail()}</aside></div>`;
+  const gov = ui.kind === "government";
+  const all = contactsOf(ui.kind);
+  const cats = [...new Set(all.map(c => c.category).filter(Boolean))].sort();
+  const rows = filteredContacts();
+  return pageHead(
+    gov ? "guardado pra depois do CNPJ" : "quem já recebeu, quem respondeu, quem sumiu",
+    gov ? "Prefeituras" : "Contatos",
+    gov ? "Secretarias do kit. Pau dos Ferros fica de fora enquanto o Kellyson for estagiário de lá." : "Clique no nome para abrir a ficha com a mensagem. Arraste no quadro para mudar de etapa.",
+    `<button class="btn" data-action="bulk-add" type="button">⇣ Colar vários</button><button class="btn primary" data-action="quick-add" type="button">＋ Novo contato</button>`
+  ) + `
+  <div class="toolbar">
+    <label class="search"><span>⌕</span><input id="search" type="search" placeholder="Buscar nome, cidade, telefone, nota…  ( / )" value="${esc(ui.search)}" aria-label="Buscar contatos"></label>
+    <label class="filter">Quem cuida <select data-field="owner-filter" aria-label="Filtrar por responsável">${opts(["Todos", ...TEAM, "Ninguém"], ui.owner)}</select></label>
+    <label class="filter">Tipo <select data-field="category-filter" aria-label="Filtrar por tipo">${opts(["Todos", ...cats], ui.category)}</select></label>
+    <div class="seg small view-toggle"><button class="${ui.view === "lista" ? "on" : ""}" data-action="view" data-view="lista" type="button">☰ Lista</button><button class="${ui.view === "quadro" ? "on" : ""}" data-action="view" data-view="quadro" type="button">▥ Quadro</button></div>
+  </div>
+  <div class="chips" role="tablist" aria-label="Etapa">
+    <button class="chip ${ui.stage === "todos" ? "on" : ""}" data-action="stage" data-stage="todos" type="button">Todos <small>${all.length}</small></button>
+    ${STAGES.map(s => `<button class="chip st-${s.id} ${ui.stage === s.id ? "on" : ""}" data-action="stage" data-stage="${s.id}" type="button"><b>${s.icon}</b>${s.label} <small>${all.filter(s.match).length}</small></button>`).join("")}
+  </div>
+  ${ui.view === "quadro" ? boardView(rows) : listView(rows)}`;
 }
 
-function rail() {
-    const meeting = leads.find(c => c.status === "Reunião marcada"), waiting = leads.filter(c => c.status === "Aguardando resposta").slice(0, 3);
-    return (meeting ? `<section class="rail-card meeting"><span class="eyebrow">✳ TEM CONVERSA BOA AQUI</span><h3>${esc(meeting.name.split(" - ")[0])}</h3><p>Reunião marcada<br>${meeting.meetingAt ? esc(new Date(meeting.meetingAt).toLocaleString("pt-BR")) : "Data e horário a registrar"}</p><button class="btn light" data-open="${meeting.id}">Abrir conversa <span>↗</span></button></section>` : "") + `<section class="rail-card"><div class="rail-head"><h2>No aguardo…</h2><span>◷</span></div>${waiting.map(c => `<div class="rail-item"><div><strong>${esc(c.name.split(" - ")[0])}</strong><small>${esc(c.channel)} · ${c.sentAt ? "enviado " + fmt(c.sentAt) : "envio sem data no Miro"}</small></div><button class="icon-btn" data-open="${c.id}" aria-label="Abrir ${esc(c.name)}">↗</button></div>`).join("") || '<p class="hint">Ninguém esperando resposta por aqui.</p>'}</section><section class="quiet-note"><span class="tiny-face">◡◡</span><strong>O vácuo não é um não.</strong><p>Mas três “oi, sumido” também não viram estratégia.</p></section>`;
+function listView(rows) {
+  if (!rows.length) return `<div class="empty"><div class="big-emoji">🔍</div><h2>Ninguém por aqui.</h2><p>Troque o filtro ou adicione um contato novo.</p><button class="btn primary" data-action="quick-add" type="button">＋ Novo contato</button></div>`;
+  return `<div class="list">${rows.slice(0, ui.limit).map((c, i) => {
+    const v = c.status === "Aguardando resposta" ? vacuum(c) : null;
+    const last = c.history?.[0];
+    const mode = c.status === "Aguardando resposta" ? "followupMessage" : "message";
+    return `<article class="row rise" style="--i:${Math.min(i, 12)}">
+      ${avatar(shortName(c))}
+      <button class="row-main" data-action="open" data-id="${c.id}" type="button"><strong>${esc(c.name)}</strong><small>${esc([c.category, c.city, channels(c)[0]?.name].filter(Boolean).join(" · "))}</small></button>
+      <div class="row-status"><select data-field="status" data-id="${c.id}" aria-label="Etapa de ${esc(shortName(c))}">${opts(STATUSES, c.status, s => STATUS[s].label)}</select></div>
+      <div class="row-owner"><select data-field="owner" data-id="${c.id}" aria-label="Quem cuida de ${esc(shortName(c))}">${opts(["", ...TEAM], c.owner || "", ownerLabel)}</select></div>
+      <div class="row-touch">${v ? `<span class="vac v-${v.cls}">${esc(v.label)}</span>` : last ? `<small>${esc(ago(last.at))}</small>` : '<small class="muted">nunca tocado</small>'}</div>
+      <div class="row-actions">
+        <button class="icon-btn" data-action="copy" data-id="${c.id}" data-mode="${mode}" title="Copiar mensagem" aria-label="Copiar mensagem para ${esc(shortName(c))}" type="button">⧉</button>
+        <button class="icon-btn" data-action="go" data-id="${c.id}" data-mode="${mode}" title="Copiar e abrir canal" aria-label="Abrir canal de ${esc(shortName(c))}" type="button">↗</button>
+        <button class="icon-btn ok" data-action="sent" data-id="${c.id}" data-mode="${mode}" title="Já mandei" aria-label="Marcar enviado para ${esc(shortName(c))}" type="button">✓</button>
+      </div>
+    </article>`;
+  }).join("")}</div>
+  <div class="list-foot"><span>${Math.min(ui.limit, rows.length)} de ${rows.length}</span>${rows.length > ui.limit ? '<button class="btn small" data-action="more" type="button">Mostrar mais</button>' : ""}</div>`;
 }
 
-function fillRows() {
-    const rows = filtered();
-    const pages = Math.max(1, Math.ceil(rows.length / 9));
-    page = Math.min(page, pages);
-    $("#rows").innerHTML = rows.slice((page - 1) * 9, page * 9).map((c, i) => `<tr><td><div class="contact-name"><span class="company-mark tone-${i % 4}">${esc(initials(c.name))}</span><button data-open="${c.id}">${esc(c.name.split(" - ")[0])}<small>${esc(c.category)} · ${esc(c.city)}</small></button></div></td><td><select data-status="${c.id}" class="row-select ${statusClass(c.status)}" aria-label="Status de ${esc(c.name)}">${options(STATUSES, c.status)}</select></td><td><select data-owner="${c.id}" class="owner-select" aria-label="Responsável por ${esc(c.name)}">${options([ "", "Kellyson", "Jeyce" ], c.owner)}</select></td><td><div class="row-actions"><button class="icon-btn" title="Copiar mensagem" aria-label="Copiar mensagem para ${esc(c.name)}" data-copy="${c.id}">⧉</button><button class="icon-btn" title="Copiar e abrir canal" aria-label="Copiar e abrir canal de ${esc(c.name)}" data-channel="${c.id}">↗</button><button class="icon-btn send-btn" title="Já enviei: marcar envio" aria-label="Marcar envio para ${esc(c.name)}" data-sent="${c.id}">✓</button></div></td></tr>`).join("") || '<tr><td colspan="4"><div class="empty"><strong>Ninguém por aqui.</strong>Tente outro filtro ou adicione um contato.</div></td></tr>';
-    $("#result-count").textContent = `${rows.length ? (page - 1) * 9 + 1 : 0}–${Math.min(page * 9, rows.length)} de ${rows.length} contatos · página ${page}/${pages}`;
-    $("#prev").disabled = page === 1;
-    $("#next").disabled = page >= pages;
-    bindActions($("#rows"));
-    $("#rows").querySelectorAll("[data-status]").forEach(e => e.onchange = () => setStatus(byId(e.dataset.status), e.value));
-    $("#rows").querySelectorAll("[data-owner]").forEach(e => e.onchange = () => {
-        const c = byId(e.dataset.owner);
-        saveField(c, "owner", e.value);
-        fillRows();
-        toast("Responsável atualizado");
-    });
+function boardView(rows) {
+  return `<div class="board-wrap"><div class="pipeline">${STAGES.map(s => {
+    const items = rows.filter(s.match);
+    return `<section class="lane st-${s.id}" data-drop="${s.drop}" data-stage-id="${s.id}" aria-label="${s.label}">
+      <header><b>${s.icon}</b>${s.label}<small>${items.length}</small></header>
+      <div class="lane-body">${items.slice(0, 40).map(c => `<article class="card" draggable="true" data-card="${c.id}">
+        <button data-action="open" data-id="${c.id}" type="button"><strong>${esc(shortName(c))}</strong><small>${esc(c.category || "")} · ${esc(c.city || "")}</small></button>
+        <div class="card-foot">${s.id === "conversa" || s.id === "parado" ? statusPill(c.status) : c.status === "Aguardando resposta" ? `<span class="vac v-${vacuum(c).cls}">${esc(vacuum(c).label)}</span>` : qualBadge(c) || "<span></span>"}${personDot(c.owner)}</div>
+      </article>`).join("")}${items.length > 40 ? `<button class="link more-lane" data-action="stage" data-stage="${s.id}" data-view="lista" type="button">+${items.length - 40} na lista</button>` : ""}${items.length ? "" : '<p class="lane-empty">solte aqui</p>'}</div>
+    </section>`;
+  }).join("")}</div></div>`;
 }
 
-function bindActions(el) {
-    el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openContact(b.dataset.open));
-    el.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => copyMessage(byId(b.dataset.copy), route() === "retornos" ? "followupMessage" : "message"));
-    el.querySelectorAll("[data-channel]").forEach(b => b.onclick = () => copyOpen(byId(b.dataset.channel), route() === "retornos" ? "followupMessage" : "message"));
-    el.querySelectorAll("[data-sent]").forEach(b => b.onclick = () => markSent(byId(b.dataset.sent)));
+function openDrawer(id, template) {
+  const c = byId(id);
+  if (!c) return;
+  const fresh = ui.drawerId !== id || !$("#drawer").open;
+  ui.drawerId = id;
+  if (template) {
+    ui.drawerTemplate = template;
+    ui.drawerDraft = null;
+  } else if (fresh) {
+    ui.drawerTemplate = c.status === "Aguardando resposta" ? "followupMessage" : TALKING.includes(c.status) ? "meet" : "message";
+    ui.drawerDraft = null;
+  }
+  renderDrawer();
+  if (!$("#drawer").open) $("#drawer").showModal();
 }
 
-function openContact(id) {
-    const c = byId(id);
-    messageMode = route() === "retornos" ? "followupMessage" : "message";
-    $("#detail-content").innerHTML = `<span class="eyebrow">FICHA DO CONTATO <button class="subtle-btn" id="edit-contact">· editar dados</button></span><h2>${esc(c.name)}</h2><div class="drawer-sub">${esc(c.category)} · ${esc(c.city)} ${c.proposal ? " / " + esc(c.proposal) : ""}</div><div class="field-grid"><div class="field"><label for="detail-status">Andamento</label><select id="detail-status">${options(STATUSES, c.status)}</select></div><div class="field"><label for="detail-owner">Quem cuida</label><select id="detail-owner">${options([ "", "Kellyson", "Jeyce" ], c.owner)}</select></div><div class="field"><label for="return-date">Lembrar de retornar</label><input type="date" id="return-date" value="${esc(c.returnAt || "")}"></div><div class="field"><label for="meeting-date">Reunião</label><input type="datetime-local" id="meeting-date" value="${esc(c.meetingAt || "")}"></div></div>${c.notes ? `<div class="note">✎ ${esc(c.notes)}</div>` : ""}<div class="message-box"><div class="message-top">Mensagem <select id="message-mode" aria-label="Tipo de mensagem">${options([ "Primeiro contato", "Retorno" ], messageMode === "message" ? "Primeiro contato" : "Retorno")}</select></div><textarea id="message" aria-label="Mensagem para o contato">${esc(c[messageMode] || "")}</textarea><div class="message-actions"><button class="btn light" id="copy-message">⧉ Copiar</button><button class="btn lime" id="open-channel">Copiar e abrir canal ↗</button></div><div class="channel-options" id="channel-options"></div></div><div class="sent-strip"><p><strong>Já mandou a mensagem?</strong>Abrir o canal não registra o envio.</p><button class="btn small light" id="sent-confirm">✓ Já enviei</button></div><div class="field"><label for="notes">Notas de vocês</label><textarea id="notes" placeholder="O que respondeu, o que combinamos, o próximo passo…">${esc(c.notes || "")}</textarea></div><div class="section-title">Histórico</div><ul class="timeline" id="timeline"></ul><button class="btn light" id="make-project">＋ Criar projeto deste contato</button><details><summary>Contexto, proposta e fonte</summary><p>${esc(c.tip || "")}</p><p>${esc(c.price || "Sem preço registrado")}</p><p>${esc(c.context || "")}</p><p>${esc(c.source || "Adicionado na demonstração")}</p></details>`;
-    $("#detail").showModal();
-    $("#edit-contact").onclick = () => contactForm(c);
-    $("#detail-status").onchange = e => {
-        setStatus(c, e.target.value);
-        updateTimeline(c);
-    };
-    $("#detail-owner").onchange = e => {
-        saveField(c, "owner", e.target.value);
-        render();
-    };
-    $("#return-date").onchange = e => saveField(c, "returnAt", e.target.value);
-    $("#meeting-date").onchange = e => {
-        saveField(c, "meetingAt", e.target.value);
-        render();
-    };
-    $("#notes").oninput = e => saveField(c, "notes", e.target.value);
-    $("#message").oninput = e => saveField(c, messageMode, e.target.value);
-    $("#message-mode").onchange = e => {
-        messageMode = e.target.value === "Retorno" ? "followupMessage" : "message";
-        $("#message").value = c[messageMode] || "";
-    };
-    $("#copy-message").onclick = () => copyMessage(c, messageMode);
-    $("#open-channel").onclick = () => copyOpen(c, messageMode);
-    $("#sent-confirm").onclick = () => {
-        markSent(c);
-        $("#detail-status").value = c.status;
-        $("#detail-owner").value = c.owner;
-        updateTimeline(c);
-    };
-    $("#make-project").onclick = () => projectForm(c);
-    $("#channel-options").innerHTML = channels(c).map(x => `<button class="subtle-btn" data-channel-name="${esc(x.name)}">${esc(x.name)} ↗</button>`).join("") || "Nenhum canal cadastrado. Edite os dados acima.";
-    $("#channel-options").querySelectorAll("button").forEach(b => b.onclick = () => copyOpen(c, messageMode, b.dataset.channelName));
-    updateTimeline(c);
+function renderDrawer() {
+  const c = byId(ui.drawerId);
+  if (!c) return $("#drawer").close();
+  const tpl = ui.drawerTemplate;
+  const text = ui.drawerDraft ?? messageFor(c, tpl);
+  const ch = channels(c, text);
+  const v = c.status === "Aguardando resposta" ? vacuum(c) : null;
+  $("#drawer-content").innerHTML = `
+  <header class="d-head">
+    ${avatar(shortName(c), "lg")}
+    <div><span class="kicker">${esc([c.category, c.city].filter(Boolean).join(" · "))}</span><h2>${esc(c.name)}</h2>
+    <div class="d-tags">${statusPill(c.status)}${v ? `<span class="vac v-${v.cls}">${esc(v.label)}</span>` : ""}${c.proposal ? `<span class="tag ink">${esc(c.proposal)}</span>` : ""}${qualBadge(c)}${c.person ? `<span class="tag">👤 ${esc(c.person)}</span>` : ""}</div></div>
+    <button class="btn small" data-action="edit-contact" data-id="${c.id}" type="button">✎ Editar</button>
+  </header>
+  <section class="d-block msg-block">
+    <div class="tpl-row" role="tablist" aria-label="Modelo de mensagem">${TEMPLATES.map(t => `<button class="chip ${tpl === t.id ? "on" : ""}" data-action="template" data-template="${t.id}" type="button">${t.label}</button>`).join("")}</div>
+    <textarea id="d-msg" data-field="drawer-msg" aria-label="Mensagem">${esc(text)}</textarea>
+    <p class="hint">${TEMPLATES.find(t => t.id === tpl)?.stored ? "Suas edições ficam salvas nesse contato." : "Modelo rápido: edite antes de mandar."} ${c.price ? "Preço de referência: <strong>" + esc(c.price) + "</strong>" : ""}</p>
+    <div class="channel-row">${ch.map((x, i) => `<button class="chan ${i ? "" : "main"}" data-action="go" data-id="${c.id}" data-channel="${esc(x.name)}" data-from="drawer" type="button"><b>${x.icon}</b>${esc(x.name)}</button>`).join("") || '<span class="hint">Nenhum canal. Clique em Editar e cole o WhatsApp ou @.</span>'}</div>
+    <div class="d-actions"><button class="btn" data-action="copy" data-id="${c.id}" data-from="drawer" type="button">⧉ Copiar</button><button class="btn primary grow" data-action="sent" data-id="${c.id}" data-mode="${tpl === "message" ? "message" : "followupMessage"}" type="button">✓ Já mandei</button></div>
+  </section>
+  <section class="d-block">
+    <h3>Etapa</h3>
+    <div class="status-grid">${STATUSES.map(s => `<button class="st-btn tone-${STATUS[s].tone} ${c.status === s ? "on" : ""}" data-action="set-status" data-id="${c.id}" data-value="${esc(s)}" type="button" aria-pressed="${c.status === s}"><b>${STATUS[s].icon}</b>${esc(STATUS[s].label)}</button>`).join("")}</div>
+    <h3>Quem cuida</h3>
+    <div class="seg small">${["", ...TEAM].map(o => `<button class="${(c.owner || "") === o ? "on" : ""}" data-action="set-owner" data-id="${c.id}" data-value="${o}" type="button">${o ? personDot(o) : ""}${esc(ownerLabel(o))}</button>`).join("")}</div>
+  </section>
+  <section class="d-block reply-block">
+    <h3>Responderam? 🎉</h3>
+    <textarea id="d-reply" placeholder="Cole aqui o que responderam (opcional)" rows="2"></textarea>
+    <button class="btn small" data-action="log-reply" data-id="${c.id}" type="button">Registrar resposta</button>
+  </section>
+  <section class="d-block">
+    <div class="field-grid">
+      <div class="field"><label for="d-return">Lembrar de retornar</label><input type="date" id="d-return" data-field="returnAt" data-id="${c.id}" value="${esc(c.returnAt || "")}"><div class="quick-dates">${[["amanhã", 1], ["+3 dias", 3], ["+1 semana", 7]].map(([l, n]) => `<button class="link" data-action="return-in" data-id="${c.id}" data-days="${n}" type="button">${l}</button>`).join("")}</div></div>
+      <div class="field"><label for="d-meeting">Reunião / conversa</label><input type="datetime-local" id="d-meeting" data-field="meetingAt" data-id="${c.id}" value="${esc(c.meetingAt || "")}"></div>
+    </div>
+    <div class="field"><label for="d-notes">Notas da dupla</label><textarea id="d-notes" data-field="notes" data-id="${c.id}" placeholder="O que combinaram, objeções, próximo passo…">${esc(c.notes || "")}</textarea></div>
+  </section>
+  ${c.tip || c.context || c.source ? `<details class="d-block"><summary>Contexto e fonte</summary>${c.tip ? `<p><b>Antes de mandar:</b> ${esc(c.tip)}</p>` : ""}${c.context ? `<p><b>O que se sabe:</b> ${esc(c.context)}</p>` : ""}${c.source ? `<p class="hint">${esc(c.source)}</p>` : ""}</details>` : ""}
+  <section class="d-block">
+    <h3>Histórico</h3>
+    <ol class="timeline">${(c.history || []).map(h => `<li class="h-${h.type}">${personDot(h.actor)}<div>${esc(h.text)}<small>${esc(h.actor)} · ${esc(ago(h.at))}</small></div></li>`).join("") || '<li class="h-empty"><div>Nenhuma movimentação registrada ainda.<small>Dados importados do Miro, sem datas.</small></div></li>'}</ol>
+  </section>
+  <div class="d-foot"><button class="btn" data-action="new-project" data-id="${c.id}" type="button">＋ Criar projeto deste cliente</button></div>`;
 }
 
-function updateTimeline(c) {
-    $("#timeline").innerHTML = (c.history || []).map(e => `<li>${esc(e.text)}<small>${esc(e.actor)} · ${fmt(e.at)}</small></li>`).join("") + `<li>Dados de exemplo importados do Miro<small>Datas e responsáveis ausentes não foram preenchidos.</small></li>`;
+function parseHandle(raw) {
+  const v = String(raw || "").trim();
+  const out = {};
+  if (!v) return out;
+  if (/instagram\.com\/|^@[\w.]+$/i.test(v)) out.instagram = v.startsWith("@") ? v : v.replace(/\?.*$/, "");
+  else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) out.email = v;
+  else if (/wa\.me\/|whatsapp|api\.whatsapp/i.test(v) || v.replace(/\D/g, "").length >= 10) {
+    const digits = v.replace(/\D/g, "");
+    const d = digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
+    out.phone = d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : v;
+  } else if (/^https?:\/\//i.test(v) || /\.\w{2,}(\/|$)/.test(v)) out.website = v.startsWith("http") ? v : "https://" + v;
+  out.channel = out.instagram ? "Instagram" : out.email ? "E-mail" : out.phone ? "WhatsApp" : out.website ? "Site" : "";
+  return out;
 }
 
-function contactForm(c) {
-    const fields = [ [ "name", "Empresa ou pessoa", "text", true ], [ "category", "Segmento", "text" ], [ "city", "Cidade", "text" ], [ "phone", "WhatsApp com DDD", "tel" ], [ "instagram", "Instagram (@ ou URL)", "text" ], [ "email", "E-mail", "email" ], [ "website", "Site", "url" ], [ "telephone", "Telefone fixo", "tel" ] ];
-    $("#form-content").innerHTML = `<h2>${c ? "Editar contato" : "Mais um contato na roda."}</h2><form id="contact-form"><div class="field-grid">${fields.map(([key, label, type, required]) => `<div class="field"><label for="f-${key}">${label}${required ? " *" : ""}</label><input id="f-${key}" name="${key}" type="${type}" value="${esc(c?.[key] || "")}" ${required ? "required" : ""}></div>`).join("")}<div class="field"><label for="f-owner">Quem cuida</label><select id="f-owner" name="owner">${options([ "", "Kellyson", "Jeyce" ], c?.owner || actor)}</select></div><div class="field"><label for="f-channel">Canal principal</label><select id="f-channel" name="channel">${options([ "WhatsApp", "Instagram", "E-mail", "Site", "Telefone" ], c?.channel || "WhatsApp")}</select></div><div class="field full"><label for="f-message">Mensagem</label><textarea id="f-message" name="message">${esc(c?.message || "Oi, tudo bem? Somos Kellyson e Jeyce, desenvolvedores aqui do Alto Oeste. Podemos conversar sobre um site ou sistema para facilitar o dia a dia de vocês?")}</textarea></div></div><button class="btn lime">${c ? "Salvar alterações" : "Adicionar contato"} ↗</button><p class="hint">Demonstração: fica salvo apenas neste navegador.</p></form>`;
-    $("#form-dialog").showModal();
-    $("#contact-form").onsubmit = e => {
-        e.preventDefault();
-        let data = Object.fromEntries(new FormData(e.target));
-        data.name = data.name.trim();
-        if (!data.name) return;
-        const existing = Boolean(c);
-        if (c) Object.assign(c, data); else {
-            c = {
-                ...data,
-                id: "custom-" + crypto.randomUUID(),
-                kind: route() === "governo" ? "government" : "private",
-                status: "A enviar",
-                priority: "Normal",
-                history: [],
-                followupMessage: "Oi! Passando para saber se conseguiu ver nossa mensagem. Podemos conversar?"
-            };
-            (c.kind === "government" ? gov : leads).unshift(c);
-        }
-        persist();
-        $("#form-dialog").close();
-        if ($("#detail").open && existing) openContact(c.id);
-        activeTab = "Todos";
-        search = "";
-        ownerFilter = "Todos";
-        channelFilter = "Todos";
-        page = 1;
-        render();
-        toast(existing ? "Contato atualizado ✓" : "Contato adicionado ✓");
-    };
+function newContact(data) {
+  return {
+    id: "c-" + uid(),
+    kind: ui.kind,
+    order: Date.now(),
+    status: "A enviar",
+    owner: "",
+    priority: "Normal",
+    city: "Pau dos Ferros",
+    message: DEFAULT_MESSAGE,
+    followupMessage: DEFAULT_FOLLOWUP,
+    history: [],
+    source: `Adicionado por ${actor()}`,
+    createdAt: now(),
+    ...data
+  };
 }
 
-function projectPage() {
-    const list = projects.filter(p => projectTab === "Todos" || (projectTab === "Entregues" ? p.status === "Entregue" : p.status !== "Entregue"));
-    return head("Os projetos da dupla.", "Em andamento, em revisão e entregues. Cada trabalho com seu lugar.", `<button class="btn" id="new-project">＋ Novo projeto</button>`) + `<div class="view-switch">${[ "Em andamento", "Entregues", "Todos" ].map(t => `<button class="${projectTab === t ? "active" : ""}" data-project-tab="${t}">${t}</button>`).join("")}</div><div class="projects-grid">${list.map(p => `<article class="project-card"><div class="project-meta"><span class="tag">${esc(p.status)}</span><span>${esc(p.owner || "Dupla")}</span></div><h3>${esc(p.name)}</h3><p>${esc(p.client || "Projeto interno")}</p><div class="progress"><div style="width:${p.tasks.length ? p.tasks.filter(t => t.status === "Feito").length / p.tasks.length * 100 : 0}%"></div></div><div class="project-meta"><span>${p.tasks.filter(t => t.status === "Feito").length}/${p.tasks.length} tarefas</span><span>${p.deadline ? "Prazo " + fmt(p.deadline + "T12:00:00") : "Sem prazo definido"}</span></div><button class="btn light" data-project="${p.id}">Abrir projeto ↗</button></article>`).join("") || `<div class="empty" style="grid-column:1/-1;border:1px dashed #ccd3bd;border-radius:10px"><strong>${projectTab === "Entregues" ? "As entregas aparecem aqui." : "Qual projeto vocês estão tocando?"}</strong>Nenhum projeto foi marcado como concluído nos arquivos recebidos.<br><br><button class="btn light" id="demo-project">Experimentar quadro com LabDemo</button></div>`}</div><div id="project-board"></div>`;
-}
-
-function projectForm(contact, project) {
-    const p = project || {
-        client: contact?.name || "",
-        owner: actor,
-        status: "Em andamento"
-    };
-    $("#form-content").innerHTML = `<span class="eyebrow">CONFIGURAÇÕES DO PROJETO</span><h2>${project ? "Tudo combinado, num lugar só." : "Vamos organizar esse trabalho."}</h2><form id="project-form"><div class="field-grid">${formInput("p", "name", "Nome do projeto", p.name, "text", true)}${formInput("p", "client", "Para quem / cliente", p.client)}<div class="field full">${formArea("p", "description", "Briefing e objetivo", p.description, "Qual problema vamos resolver? O que foi combinado?")}</div>${formSelect("p", "owner", "Quem cuida", [ "Kellyson", "Jeyce", "Dupla" ], p.owner)}${formSelect("p", "status", "Situação", [ "Em andamento", "Em revisão", "Entregue" ], p.status)}${formInput("p", "deadline", "Prazo combinado", p.deadline, "date")}${formInput("p", "delivery", "O que será entregue", p.delivery)}${formInput("p", "url", "Link da entrega", p.url, "url")}${formInput("p", "repository", "Repositório / arquivos", p.repository, "url")}<div class="field full">${formArea("p", "scope", "Escopo e critérios de aprovação", p.scope, "Funcionalidades, limites e como saber que está pronto.")}</div><div class="field full">${formArea("p", "notes", "Notas e combinados", p.notes, "Decisões, referências e pedidos do cliente.")}</div></div><div class="form-actions"><button class="btn lime" type="submit">Salvar projeto ✓</button><button class="btn light" type="button" id="copy-project-form">⧉ Copiar briefing</button></div><p class="hint">Dados de demonstração · salvos neste navegador.</p></form>`;
-    $("#form-dialog").showModal();
-    $("#copy-project-form").onclick = () => copyText(projectText({
-        ...p,
-        ...formValues("#project-form")
-    }, false), "Briefing copiado");
-    $("#project-form").onsubmit = e => {
-        e.preventDefault();
-        const data = formValues("#project-form");
-        if (!data.name.trim()) return;
-        let saved = project;
-        if (saved) Object.assign(saved, data, {
-            updatedAt: now()
-        }); else {
-            saved = {
-                ...data,
-                id: "project-" + crypto.randomUUID(),
-                contactId: contact?.id,
-                tasks: [],
-                createdAt: now()
-            };
-            projects.unshift(saved);
-        }
-        persist();
-        $("#form-dialog").close();
-        $("#detail").close();
-        projectTab = "Todos";
-        write("open-project", saved.id);
-        location.hash = "projetos";
-        render();
-        toast("Projeto atualizado ✓");
-    };
-}
-
-function formInput(prefix, key, label, value, type = "text", required = false) {
-    return `<div class="field"><label for="${prefix}-${key}">${label}${required ? " *" : ""}</label><input id="${prefix}-${key}" name="${key}" type="${type}" value="${esc(value || "")}" ${required ? "required" : ""}></div>`;
-}
-
-function formArea(prefix, key, label, value, placeholder = "") {
-    return `<label for="${prefix}-${key}">${label}</label><textarea id="${prefix}-${key}" name="${key}" placeholder="${esc(placeholder)}">${esc(value || "")}</textarea>`;
-}
-
-function formSelect(prefix, key, label, values, value) {
-    return `<div class="field"><label for="${prefix}-${key}">${label}</label><select id="${prefix}-${key}" name="${key}">${options(values, value)}</select></div>`;
-}
-
-function formValues(selector) {
-    return Object.fromEntries(new FormData($(selector)));
-}
-
-async function copyText(text, label = "Copiado") {
-    try {
-        await navigator.clipboard.writeText(text);
-        toast(label + " ✓");
-    } catch {
-        toast("Não foi possível copiar. Tente novamente pelo navegador.");
+function quickAddForm() {
+  const cats = [...new Set(Store.contacts.map(c => c.category).filter(Boolean))].sort();
+  modal(`
+  <span class="kicker">mais uma porta pra bater 🚪</span>
+  <h2>Novo contato</h2>
+  <form id="quick-form" class="form">
+    <div class="field"><label for="q-handle">Cole o WhatsApp, @, link ou e-mail</label><input id="q-handle" name="handle" autocomplete="off" placeholder="ex.: (84) 99999-0000 ou instagram.com/loja" autofocus><span class="detect" id="q-detect"></span></div>
+    <div class="field-grid">
+      <div class="field"><label for="q-name">Nome do negócio *</label><input id="q-name" name="name" required></div>
+      <div class="field"><label for="q-person">Pessoa de contato</label><input id="q-person" name="person" placeholder="opcional"></div>
+      <div class="field"><label for="q-category">Tipo</label><input id="q-category" name="category" list="q-cats" placeholder="Saúde, Academia…"><datalist id="q-cats">${cats.map(x => `<option value="${esc(x)}">`).join("")}</datalist></div>
+      <div class="field"><label for="q-city">Cidade</label><input id="q-city" name="city" value="Pau dos Ferros"></div>
+    </div>
+    <div class="field"><label for="q-message">Mensagem</label><textarea id="q-message" name="message">${esc(fillTemplate(DEFAULT_MESSAGE, {}))}</textarea></div>
+    <label class="check"><input type="checkbox" name="already"> Já mandei mensagem pra esse contato</label>
+    <div class="form-actions"><button class="btn primary" type="submit">Adicionar ✓</button><button class="btn" type="submit" name="go" value="turbo">Adicionar e mandar agora ⚡</button></div>
+  </form>`);
+  const detect = () => { const p = parseHandle($("#q-handle").value); $("#q-detect").textContent = p.channel ? `✓ ${p.channel} detectado` : ""; };
+  $("#q-handle").oninput = detect;
+  $("#quick-form").onsubmit = e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const goTurbo = e.submitter?.value === "turbo";
+    const c = newContact({ name: f.name.trim(), person: f.person.trim(), category: f.category.trim(), city: f.city.trim(), message: f.message, ...parseHandle(f.handle) });
+    if (!c.name) return;
+    log(c, "Contato adicionado", "add");
+    if (f.already) {
+      c.status = "Aguardando resposta";
+      c.sentAt = now();
+      c.owner = actor();
+      c.returnAt = addDays(3);
+      log(c, "Mandou a primeira mensagem", "sent");
     }
+    Store.saveContact(c);
+    $("#modal").close();
+    toast(`${shortName(c)} entrou na roda ✓`);
+    if (goTurbo && !f.already) {
+      ui.turbo.mode = "novos";
+      ui.turbo.first = c.id;
+      if (route() === "turbo") { buildQueue(); render(); } else location.hash = "turbo";
+    }
+  };
 }
 
-function fullDate(value) {
-    return value ? new Date(value + "T12:00:00").toLocaleDateString("pt-BR") : "Não definido";
+function bulkAddForm() {
+  modal(`
+  <span class="kicker">modo atacadão 📦</span>
+  <h2>Colar vários contatos</h2>
+  <p class="hint">Um por linha, separado por <b>;</b> ou <b>tab</b> (dá pra colar direto da planilha): <code>Nome; contato; tipo; cidade</code></p>
+  <form id="bulk-form" class="form">
+    <textarea id="bulk-text" rows="8" placeholder="Ótica Visão; (84) 99999-1111; Ótica; Pau dos Ferros&#10;Academia Fit; @academiafit; Academia; Encanto"></textarea>
+    <p class="hint" id="bulk-preview">Nada pra importar ainda.</p>
+    <div class="form-actions"><button class="btn primary" type="submit">Importar</button></div>
+  </form>`);
+  const parse = () => $("#bulk-text").value.split("\n").map(l => l.split(/\t|;/).map(x => x.trim())).filter(p => p[0]);
+  $("#bulk-text").oninput = () => { const n = parse().length; $("#bulk-preview").textContent = n ? `${n} contato${n > 1 ? "s" : ""} prontos pra entrar.` : "Nada pra importar ainda."; };
+  $("#bulk-form").onsubmit = e => {
+    e.preventDefault();
+    const lines = parse();
+    lines.forEach(([name, handle, category, city], i) => {
+      const c = newContact({ name, category: category || "", city: city || "Pau dos Ferros", order: Date.now() + i, ...parseHandle(handle) });
+      log(c, "Contato adicionado em lote", "add");
+      Store.saveContact(c, { silent: true });
+    });
+    $("#modal").close();
+    render();
+    toast(`${lines.length} contatos novos na fila 📦`);
+  };
+}
+
+function editContactForm(c) {
+  const fields = [["name", "Nome *"], ["person", "Pessoa de contato"], ["category", "Tipo"], ["city", "Cidade"], ["phone", "WhatsApp"], ["instagram", "Instagram (@ ou link)"], ["email", "E-mail"], ["website", "Site"], ["telephone", "Telefone fixo"], ["price", "Preço de referência"], ["proposal", "Proposta (criar, melhorar…)"]];
+  modal(`
+  <span class="kicker">ficha do contato</span>
+  <h2>Editar ${esc(shortName(c))}</h2>
+  <form id="edit-form" class="form">
+    <div class="field-grid">${fields.map(([k, l]) => `<div class="field"><label for="e-${k}">${l}</label><input id="e-${k}" name="${k}" value="${esc(c[k] || "")}" ${k === "name" ? "required" : ""}></div>`).join("")}
+      <div class="field"><label for="e-channel">Canal principal</label><select id="e-channel" name="channel">${opts(["WhatsApp", "Instagram", "E-mail", "Site", "Telefone"], c.channel === "Fixo" ? "Telefone" : c.channel)}</select></div>
+      <div class="field"><label for="e-priority">Prioridade</label><select id="e-priority" name="priority">${opts(["Alta", "Normal", "Baixa"], c.priority || "Normal")}</select></div>
+    </div>
+    <div class="field"><label for="e-message">Mensagem de primeiro contato</label><textarea id="e-message" name="message">${esc(c.message || "")}</textarea></div>
+    <div class="field"><label for="e-followup">Mensagem de retorno</label><textarea id="e-followup" name="followupMessage">${esc(c.followupMessage || "")}</textarea></div>
+    <p class="hint">Variáveis: {oi} {nome} {empresa} {eu} {cidade} {preco} {prazo}</p>
+    <div class="form-actions"><button class="btn primary" type="submit">Salvar ✓</button></div>
+  </form>`);
+  $("#edit-form").onsubmit = e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    if (!data.name.trim()) return;
+    Object.assign(c, data);
+    log(c, "Editou a ficha", "edit");
+    Store.saveContact(c);
+    $("#modal").close();
+    if ($("#drawer").open) renderDrawer();
+    toast("Ficha atualizada ✓");
+  };
+}
+
+function modal(html) {
+  $("#modal-content").innerHTML = html;
+  if (!$("#modal").open) $("#modal").showModal();
+}
+
+function fullDate(v) {
+  return v ? new Date(v + "T12:00:00").toLocaleDateString("pt-BR") : "não definido";
 }
 
 function taskText(p, t) {
-    return [ `TAREFA: ${t.name}`, `Projeto: ${p.name}`, `Para quem: ${t.recipient || p.client || "Projeto interno"}`, `Responsável: ${t.owner || "Dupla"}`, `Status: ${t.status}`, `Prioridade: ${t.priority || "Normal"}`, `Prazo: ${fullDate(t.deadline)}`, `Entrega: ${t.delivery || "Não especificada"}`, t.description && `\nDESCRIÇÃO\n${t.description}`, t.checklist?.length && `\nPARA CONCLUIR\n${t.checklist.map(x => `[${x.done ? "x" : " "}] ${x.text}`).join("\n")}`, t.links && `\nLINKS E REFERÊNCIAS\n${t.links}`, t.notes && `\nNOTAS\n${t.notes}` ].filter(Boolean).join("\n");
+  return [
+    `TAREFA: ${t.name}`, `Projeto: ${p.name}`, `Para quem: ${t.recipient || p.client || "Projeto interno"}`, `Responsável: ${t.owner || "Dupla"}`, `Status: ${t.status}`, `Prioridade: ${t.priority || "Normal"}`, `Prazo: ${fullDate(t.deadline)}`, `Entrega: ${t.delivery || "não especificada"}`,
+    t.description && `\nDESCRIÇÃO\n${t.description}`,
+    t.checklist?.length && `\nPARA CONCLUIR\n${t.checklist.map(x => `[${x.done ? "x" : " "}] ${x.text}`).join("\n")}`,
+    t.links && `\nLINKS\n${t.links}`,
+    t.notes && `\nNOTAS\n${t.notes}`
+  ].filter(Boolean).join("\n");
 }
 
 function projectText(p, withTasks = true) {
-    return [ `PROJETO: ${p.name}`, `Cliente: ${p.client || "Projeto interno"}`, `Responsável: ${p.owner || "Dupla"}`, `Status: ${p.status}`, `Prazo: ${fullDate(p.deadline)}`, `Entrega: ${p.delivery || "Não especificada"}`, p.description && `\nBRIEFING\n${p.description}`, p.scope && `\nESCOPO E APROVAÇÃO\n${p.scope}`, p.url && `\nLink da entrega: ${p.url}`, p.repository && `Repositório / arquivos: ${p.repository}`, p.notes && `\nNOTAS E COMBINADOS\n${p.notes}`, withTasks && p.tasks?.length && `\nTAREFAS (${p.tasks.filter(t => t.status === "Feito").length}/${p.tasks.length} concluídas)\n\n${p.tasks.map(t => taskText(p, t)).join("\n\n--------------------\n\n")}` ].filter(Boolean).join("\n");
+  return [
+    `PROJETO: ${p.name}`, `Cliente: ${p.client || "Projeto interno"}`, `Responsável: ${p.owner || "Dupla"}`, `Status: ${p.status}`, `Prazo: ${fullDate(p.deadline)}`, `Entrega: ${p.delivery || "não especificada"}`, p.value && `Valor: ${p.value}`,
+    p.description && `\nBRIEFING\n${p.description}`,
+    p.scope && `\nESCOPO E APROVAÇÃO\n${p.scope}`,
+    p.url && `\nEntrega: ${p.url}`, p.repository && `Repositório: ${p.repository}`,
+    p.notes && `\nNOTAS\n${p.notes}`,
+    withTasks && p.tasks?.length && `\nTAREFAS (${p.tasks.filter(t => t.status === "Feito").length}/${p.tasks.length} feitas)\n\n${p.tasks.map(t => taskText(p, t)).join("\n\n----------\n\n")}`
+  ].filter(Boolean).join("\n");
+}
+
+const input = (id, name, label, value, type = "text", req = false) => `<div class="field"><label for="${id}">${label}${req ? " *" : ""}</label><input id="${id}" name="${name}" type="${type}" value="${esc(value || "")}" ${req ? "required" : ""}></div>`;
+const area = (id, name, label, value, ph = "") => `<div class="field full"><label for="${id}">${label}</label><textarea id="${id}" name="${name}" placeholder="${esc(ph)}">${esc(value || "")}</textarea></div>`;
+const sel = (id, name, label, values, value) => `<div class="field"><label for="${id}">${label}</label><select id="${id}" name="${name}">${opts(values, value)}</select></div>`;
+
+function projectForm(contact, project) {
+  const p = project || { client: contact ? shortName(contact) : "", owner: actor(), status: "Em andamento", value: contact?.price || "" };
+  modal(`
+  <span class="kicker">configurações do projeto</span>
+  <h2>${project ? "Tudo combinado, num lugar só" : "Bora organizar esse trabalho"}</h2>
+  <form id="project-form" class="form"><div class="field-grid">
+    ${input("p-name", "name", "Nome do projeto", p.name, "text", true)}${input("p-client", "client", "Cliente", p.client)}
+    ${area("p-description", "description", "Briefing e objetivo", p.description, "Que problema vamos resolver? O que foi combinado?")}
+    ${sel("p-owner", "owner", "Quem cuida", ["Kellyson", "Jeyce", "Dupla"], p.owner)}${sel("p-status", "status", "Situação", ["Em andamento", "Em revisão", "Entregue"], p.status)}
+    ${input("p-deadline", "deadline", "Prazo", p.deadline, "date")}${input("p-value", "value", "Valor combinado", p.value)}
+    ${input("p-delivery", "delivery", "O que será entregue", p.delivery)}${input("p-url", "url", "Link da entrega", p.url, "url")}
+    ${input("p-repository", "repository", "Repositório / arquivos", p.repository, "url")}
+    ${area("p-scope", "scope", "Escopo e critérios de aprovação", p.scope, "Como saber que está pronto?")}
+    ${area("p-notes", "notes", "Notas e combinados", p.notes)}
+  </div><div class="form-actions"><button class="btn primary" type="submit">Salvar projeto ✓</button><button class="btn" type="button" id="copy-project-form">⧉ Copiar briefing</button>${project ? '<button class="btn danger" type="button" id="delete-project">Excluir</button>' : ""}</div></form>`);
+  $("#copy-project-form").onclick = () => copy(projectText({ ...p, ...Object.fromEntries(new FormData($("#project-form"))) }, false), "Briefing copiado");
+  if (project) $("#delete-project").onclick = () => {
+    const snap = JSON.parse(JSON.stringify(project));
+    Store.removeProject(project.id);
+    ui.openProject = null;
+    $("#modal").close();
+    toast("Projeto excluído", () => Store.saveProject(snap));
+  };
+  $("#project-form").onsubmit = e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    if (!data.name.trim()) return;
+    let saved = project;
+    if (saved) Object.assign(saved, data, { updatedAt: now() });
+    else saved = { ...data, id: "p-" + uid(), contactId: contact?.id || "", tasks: [], createdAt: now() };
+    Store.saveProject(saved);
+    if (contact && !project) {
+      log(contact, `Virou o projeto “${saved.name}”`, "project");
+      Store.saveContact(contact, { silent: true });
+    }
+    $("#modal").close();
+    $("#drawer").close();
+    ui.openProject = saved.id;
+    Store.local.write("open-project", saved.id);
+    ui.projectTab = "Todos";
+    if (route() !== "projetos") location.hash = "projetos";
+    else render();
+    toast("Projeto salvo ✓");
+  };
 }
 
 function taskForm(p, task) {
-    const t = task || {
-        owner: actor,
-        status: "A fazer",
-        priority: "Normal",
-        recipient: p.client || "",
-        deadline: p.deadline || "",
-        checklist: []
-    };
-    $("#form-content").innerHTML = `<span class="eyebrow">${esc(p.name)} / TAREFA</span><h2>${task ? "Detalhes da tarefa" : "O que precisa ser feito?"}</h2><form id="task-form"><div class="field-grid"><div class="field full"><label for="task-name">Título da tarefa *</label><input id="task-name" name="name" value="${esc(t.name || "")}" required></div><div class="field full">${formArea("task", "description", "Descrição e contexto", t.description, "Explique o que fazer e por quê. Dá para colar esse texto direto no agente.")}</div>${formSelect("task", "owner", "Responsável", [ "Kellyson", "Jeyce", "Dupla" ], t.owner)}${formSelect("task", "status", "Andamento", TASK_STATES, t.status)}${formInput("task", "recipient", "Para quem / solicitante", t.recipient || p.client)}${formInput("task", "deadline", "Data da entrega", t.deadline, "date")}${formSelect("task", "priority", "Prioridade", [ "Baixa", "Normal", "Alta", "Urgente" ], t.priority || "Normal")}${formInput("task", "delivery", "Entrega esperada", t.delivery)}<div class="field full">${formArea("task", "criteria", "Checklist de conclusão", t.checklist?.map(c => c.text).join("\n"), "Uma condição por linha. Ex.: formulário funcionando no celular.")}<p class="hint">Depois de salvar, marque cada item no quadro do projeto.</p></div><div class="field full">${formArea("task", "links", "Links e referências", t.links, "Protótipo, página, repositório ou arquivo. Um por linha.")}</div><div class="field full">${formArea("task", "notes", "Notas e combinados", t.notes, "Observações, decisões e o que falta confirmar.")}</div></div><div class="form-actions"><button class="btn lime" type="submit">Salvar tarefa ✓</button><button class="btn light" id="copy-task-form" type="button">⧉ Copiar tudo</button></div></form>`;
-    const draft = () => {
-        const d = formValues("#task-form");
-        const checklist = d.criteria.split("\n").map(x => x.trim()).filter(Boolean).map(text => ({
-            text: text,
-            done: t.checklist?.find(x => x.text === text)?.done || false
-        }));
-        delete d.criteria;
-        return {
-            ...t,
-            ...d,
-            checklist: checklist
-        };
-    };
-    $("#form-dialog").showModal();
-    $("#copy-task-form").onclick = () => copyText(taskText(p, draft()), "Tarefa copiada");
-    $("#task-form").onsubmit = e => {
-        e.preventDefault();
-        const d = draft();
-        if (!d.name.trim()) return;
-        if (task) Object.assign(task, d, {
-            updatedAt: now()
-        }); else p.tasks.push({
-            ...d,
-            id: crypto.randomUUID(),
-            createdAt: now()
-        });
-        p.updatedAt = now();
-        persist();
-        $("#form-dialog").close();
-        render();
-        openProject(p.id, false);
-        toast("Tarefa salva ✓");
-    };
-}
-
-function openProject(id, scroll = true) {
-    const p = projects.find(p => p.id === id);
-    if (!p || !$("#project-board")) return;
-    write("open-project", id);
-    $("#project-board").innerHTML = `<section class="project-workspace"><div class="project-workspace-top"><div><span class="eyebrow">ÁREA DO PROJETO / ${esc(p.client || "INTERNO")}</span><h2>${esc(p.name)}</h2></div><div class="project-action-bar"><button class="btn light small" id="copy-project">⧉ Copiar tudo</button><button class="btn light small" id="copy-brief">⧉ Briefing</button><button class="btn light small" id="edit-project">⚙ Configurar</button><button class="btn small" id="add-task">＋ Tarefa</button></div></div><div class="project-overview"><div class="project-facts"><div><span>QUEM CUIDA</span><strong>${esc(p.owner || "Dupla")}</strong></div><div><span>ENTREGA</span><strong>${esc(fullDate(p.deadline))}</strong></div><div><span>SITUAÇÃO</span><strong>${esc(p.status)}</strong></div><div><span>O QUE ENTREGAR</span><strong>${esc(p.delivery || "A combinar")}</strong></div></div>${p.description ? `<p class="project-description">${esc(p.description)}</p>` : '<p class="hint">Registre o briefing em Configurar para deixar o combinado acessível para a dupla.</p>'}<div class="project-links">${[ [ "Entrega", p.url ], [ "Repositório / arquivos", p.repository ] ].map(([label, url]) => safeUrl(url) ? `<a class="btn light small" href="${esc(safeUrl(url))}" target="_blank" rel="noopener">${label} ↗</a>` : "").join("")}</div><details class="project-notebook"><summary>✎ Notas, combinados e escopo</summary><div class="field-grid"><div class="field">${formArea("workspace", "notes", "Notas compartilhadas", p.notes, "Anotem decisões, feedback e próximos passos.")}</div><div class="field">${formArea("workspace", "scope", "Escopo e aprovação", p.scope, "Como saber que o projeto está pronto?")}</div></div><div class="notebook-foot"><span id="note-saved">Salvo neste navegador</span><button class="subtle-btn" id="copy-project-notes">⧉ Copiar notas</button></div></details></div><div class="board">${TASK_STATES.map(s => `<section class="board-col"><h3>${s}<span>${p.tasks.filter(t => t.status === s).length}</span></h3>${p.tasks.filter(t => t.status === s).map(t => `<article class="task-card detailed-task"><div class="task-card-top"><span class="eyebrow">${esc(t.owner || "Dupla")}</span>${t.priority && t.priority !== "Normal" ? `<span class="task-priority ${t.priority === "Urgente" ? "urgent" : ""}">${esc(t.priority)}</span>` : ""}</div><button class="task-title" data-edit-task="${t.id}">${esc(t.name)}</button>${t.description ? `<p class="task-preview">${esc(t.description)}</p>` : ""}<div class="task-facts">${t.recipient ? `<span>↗ ${esc(t.recipient)}</span>` : ""}${t.deadline ? `<span>◷ ${esc(fullDate(t.deadline))}</span>` : ""}${t.delivery ? `<span>▤ ${esc(t.delivery)}</span>` : ""}</div>${t.checklist?.length ? `<details class="task-checklist"><summary>✓ ${t.checklist.filter(c => c.done).length}/${t.checklist.length} critérios</summary>${t.checklist.map((c, i) => `<label><input type="checkbox" data-criterion="${t.id}" data-index="${i}" ${c.done ? "checked" : ""}><span>${esc(c.text)}</span></label>`).join("")}</details>` : ""}<div class="task-card-controls"><select data-task-status="${t.id}" aria-label="Status de ${esc(t.name)}">${options(TASK_STATES, t.status)}</select><select data-task-owner="${t.id}" aria-label="Responsável por ${esc(t.name)}">${options([ "Kellyson", "Jeyce", "Dupla" ], t.owner)}</select></div><div class="task-card-actions"><button data-edit-task="${t.id}">Detalhar ↗</button><button data-copy-task="${t.id}" aria-label="Copiar tarefa ${esc(t.name)}">⧉ Copiar</button></div></article>`).join("") || '<div class="column-empty">As tarefas desta etapa aparecem aqui.</div>'}</section>`).join("")}</div></section>`;
-    $("#edit-project").onclick = () => projectForm(null, p);
-    $("#add-task").onclick = () => taskForm(p);
-    $("#copy-project").onclick = () => copyText(projectText(p), "Projeto completo copiado");
-    $("#copy-brief").onclick = () => copyText(projectText(p, false), "Briefing copiado");
-    $("#copy-project-notes").onclick = () => copyText([ p.name, p.notes || "Sem notas", p.scope || "" ].filter(Boolean).join("\n\n"), "Notas copiadas");
-    [ "notes", "scope" ].forEach(key => $("#workspace-" + key).oninput = e => {
-        p[key] = e.target.value;
-        p.updatedAt = now();
-        persist();
-        $("#note-saved").textContent = "Alterações salvas neste navegador ✓";
-    });
-    const board = $("#project-board");
-    board.querySelectorAll("[data-edit-task]").forEach(b => b.onclick = () => taskForm(p, p.tasks.find(t => t.id === b.dataset.editTask)));
-    board.querySelectorAll("[data-copy-task]").forEach(b => b.onclick = () => copyText(taskText(p, p.tasks.find(t => t.id === b.dataset.copyTask)), "Tarefa copiada"));
-    board.querySelectorAll("[data-task-status]").forEach(e => e.onchange = () => {
-        p.tasks.find(t => t.id === e.dataset.taskStatus).status = e.value;
-        persist();
-        render();
-        openProject(id, false);
-    });
-    board.querySelectorAll("[data-task-owner]").forEach(e => e.onchange = () => {
-        p.tasks.find(t => t.id === e.dataset.taskOwner).owner = e.value;
-        persist();
-        openProject(id, false);
-    });
-    board.querySelectorAll("[data-criterion]").forEach(e => e.onchange = () => {
-        p.tasks.find(t => t.id === e.dataset.criterion).checklist[Number(e.dataset.index)].done = e.checked;
-        persist();
-        e.closest("details").querySelector("summary").textContent = "✓ " + p.tasks.find(t => t.id === e.dataset.criterion).checklist.filter(c => c.done).length + "/" + p.tasks.find(t => t.id === e.dataset.criterion).checklist.length + " critérios";
-    });
-    if (scroll) $("#project-board").scrollIntoView({
-        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-        block: "start"
-    });
+  const t = task || { owner: actor(), status: "A fazer", priority: "Normal", recipient: p.client || "", deadline: p.deadline || "", checklist: [] };
+  modal(`
+  <span class="kicker">${esc(p.name)} / tarefa</span>
+  <h2>${task ? "Detalhes da tarefa" : "O que precisa ser feito?"}</h2>
+  <form id="task-form" class="form"><div class="field-grid">
+    <div class="field full"><label for="t-name">Título *</label><input id="t-name" name="name" value="${esc(t.name || "")}" required></div>
+    ${area("t-description", "description", "Descrição e contexto", t.description, "Explique o que fazer e por quê. Dá para colar direto no agente.")}
+    ${sel("t-owner", "owner", "Responsável", ["Kellyson", "Jeyce", "Dupla"], t.owner)}${sel("t-status", "status", "Andamento", TASK_STATES, t.status)}
+    ${input("t-recipient", "recipient", "Para quem / solicitante", t.recipient)}${input("t-deadline", "deadline", "Data da entrega", t.deadline, "date")}
+    ${sel("t-priority", "priority", "Prioridade", ["Baixa", "Normal", "Alta", "Urgente"], t.priority || "Normal")}${input("t-delivery", "delivery", "Entrega esperada", t.delivery)}
+    ${area("t-criteria", "criteria", "Checklist de conclusão (um por linha)", (t.checklist || []).map(x => x.text).join("\n"), "Ex.: formulário funcionando no celular")}
+    ${area("t-links", "links", "Links e referências", t.links)}
+    ${area("t-notes", "notes", "Notas e combinados", t.notes)}
+  </div><div class="form-actions"><button class="btn primary" type="submit">Salvar tarefa ✓</button><button class="btn" type="button" id="copy-task-form">⧉ Copiar tudo</button>${task ? '<button class="btn danger" type="button" id="delete-task">Excluir</button>' : ""}</div></form>`);
+  const draft = () => {
+    const d = Object.fromEntries(new FormData($("#task-form")));
+    const checklist = d.criteria.split("\n").map(x => x.trim()).filter(Boolean).map(text => ({ text, done: t.checklist?.find(x => x.text === text)?.done || false }));
+    delete d.criteria;
+    return { ...t, ...d, checklist };
+  };
+  $("#copy-task-form").onclick = () => copy(taskText(p, draft()), "Tarefa copiada");
+  if (task) $("#delete-task").onclick = () => { p.tasks = p.tasks.filter(x => x.id !== task.id); Store.saveProject(p); $("#modal").close(); toast("Tarefa excluída"); };
+  $("#task-form").onsubmit = e => {
+    e.preventDefault();
+    const d = draft();
+    if (!d.name.trim()) return;
+    if (task) Object.assign(task, d, { updatedAt: now() });
+    else p.tasks.push({ ...d, id: "t-" + uid(), createdAt: now() });
+    Store.saveProject(p);
+    $("#modal").close();
+    toast("Tarefa salva ✓");
+  };
 }
 
 function demoProject() {
-    let p = projects.find(p => p.id === "demo-lab");
-    if (!p) {
-        p = {
-            id: "demo-lab",
-            name: "LabDemo",
-            client: "Exemplo de organização · não é cliente fechado",
-            status: "Em andamento",
-            owner: "Dupla",
-            tasks: [ "Configurar o projeto", "Página de unidades", "Catálogo com busca", "Página do exame", "Agendar: unidade e exames", "Agendar: dia e horário", "Agendar: confirmação", "Painel da recepção", "Acabamento no celular" ].map((name, i) => ({
-                id: "lab-" + i,
-                name: name,
-                owner: i === 0 ? "Kellyson" : "Jeyce",
-                status: "A fazer"
-            }))
-        };
-        projects.push(p);
-        persist();
-    }
-    render();
-    openProject(p.id);
+  const p = {
+    id: "p-" + uid(), name: "LabDemo", client: "Exemplo · agendamento de exames", status: "Em andamento", owner: "Dupla", createdAt: now(),
+    description: "Protótipo de agendamento online de exames para mostrar a laboratórios e clínicas da lista.",
+    tasks: ["Configurar o projeto", "Página de unidades", "Catálogo com busca", "Página do exame", "Agendar: unidade e exames", "Agendar: dia e horário", "Agendar: confirmação", "Painel da recepção"].map((name, i) => ({ id: "t-" + uid(), name, owner: i ? "Jeyce" : "Kellyson", status: "A fazer", priority: "Normal", checklist: [] }))
+  };
+  Store.saveProject(p);
+  ui.openProject = p.id;
+  Store.local.write("open-project", p.id);
+  render();
 }
 
-function library() {
-    return head("Materiais de apoio.", "Os arquivos ficam aqui quando vocês precisarem.") + `<div class="resources">${[ [ "Proposta comercial", "Escopo e preço para enviar ao cliente.", "modelos/proposta_comercial.docx" ], [ "Mensagens", "Modelos de e-mail do kit original.", "divulgacao/emails.md" ], [ "Declarações", "Documentos para contratação.", "modelos/declaracoes_contratacao.docx" ], [ "Atestado técnico", "Modelo de capacidade técnica.", "modelos/atestado_capacidade_tecnica_modelo.docx" ], [ "Tratamento de dados", "Modelo de termo do kit.", "modelos/termo_tratamento_dados.docx" ], [ "Instagram", "Legendas e materiais de divulgação.", "divulgacao/instagram.md" ] ].map(([t, d, u]) => `<article class="resource"><span class="eyebrow">ARQUIVO DO KIT</span><h3>${t}</h3><p>${d}</p><a href="kit/${u}" download>Baixar ↗</a></article>`).join("")}</div><div class="page-note" style="margin-top:22px">Empresa: vocês anotaram que querem evitar gastos e avaliar a estrutura existente antes de abrir outra. Esses pontos ficam como notas para revisão, sem transformar o guia antigo em regra para a dupla.</div><a class="btn light" href="plano-original.html" target="_blank" rel="noopener">Consultar material original ↗</a>`;
+function projectsPage() {
+  const list = Store.projects.filter(p => ui.projectTab === "Todos" || (ui.projectTab === "Entregues" ? p.status === "Entregue" : p.status !== "Entregue"));
+  const open = projectById(ui.openProject);
+  return pageHead("da conversa à entrega", "Projetos", "Cada cliente fechado vira um projeto com briefing, tarefas e entrega.", '<button class="btn primary" data-action="new-project" type="button">＋ Novo projeto</button>') + `
+  <div class="seg small">${["Em andamento", "Entregues", "Todos"].map(t => `<button class="${ui.projectTab === t ? "on" : ""}" data-action="project-tab" data-tab="${t}" type="button">${t}</button>`).join("")}</div>
+  <div class="projects-grid">${list.map((p, i) => { const done = p.tasks.filter(t => t.status === "Feito").length; return `
+    <article class="project-card rise ${open?.id === p.id ? "on" : ""}" style="--i:${i}">
+      <div class="pc-top"><span class="pill tone-${p.status === "Entregue" ? "win" : p.status === "Em revisão" ? "reply" : "wait"}">${esc(p.status)}</span><span>${esc(p.owner || "Dupla")}</span></div>
+      <h3>${esc(p.name)}</h3><p>${esc(p.client || "Projeto interno")}</p>
+      <div class="meter thin"><div style="width:${p.tasks.length ? (done / p.tasks.length) * 100 : 0}%"></div></div>
+      <div class="pc-foot"><span>${done}/${p.tasks.length} tarefas</span><span>${p.deadline ? "prazo " + esc(fmtDay(p.deadline)) : "sem prazo"}</span></div>
+      <button class="btn small" data-action="open-project" data-id="${p.id}" type="button">${open?.id === p.id ? "Aberto ↓" : "Abrir ↗"}</button>
+    </article>`; }).join("") || `<div class="empty"><div class="big-emoji">🛠️</div><h2>${ui.projectTab === "Entregues" ? "As entregas aparecem aqui." : "Nenhum projeto ainda."}</h2><p>Quando um cliente fechar, crie o projeto pela ficha dele.</p><button class="btn" data-action="demo-project" type="button">Ver exemplo com o LabDemo</button></div>`}</div>
+  ${open ? projectWorkspace(open) : ""}`;
+}
+
+function projectWorkspace(p) {
+  return `<section class="workspace" id="workspace">
+    <header class="ws-head"><div><span class="kicker">${esc(p.client || "interno")}</span><h2>${esc(p.name)}</h2></div>
+      <div class="head-actions"><button class="btn small" data-action="copy-project" data-id="${p.id}" type="button">⧉ Tudo</button><button class="btn small" data-action="copy-brief" data-id="${p.id}" type="button">⧉ Briefing</button><button class="btn small" data-action="edit-project" data-id="${p.id}" type="button">⚙ Configurar</button><button class="btn small primary" data-action="add-task" data-id="${p.id}" type="button">＋ Tarefa</button></div></header>
+    <div class="facts">${[["quem cuida", p.owner || "Dupla"], ["prazo", fullDate(p.deadline)], ["situação", p.status], ["entrega", p.delivery || "a combinar"], ["valor", p.value || "—"]].map(([k, v]) => `<div><span>${k}</span><strong>${esc(v)}</strong></div>`).join("")}</div>
+    ${p.description ? `<p class="brief">${esc(p.description)}</p>` : ""}
+    <div class="ws-links">${[["Entrega", p.url], ["Repositório", p.repository]].map(([l, u]) => safeUrl(u) ? `<a class="btn small" href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${l} ↗</a>` : "").join("")}</div>
+    <details class="notebook"><summary>✎ Notas e escopo</summary><div class="field-grid">
+      <div class="field"><label for="ws-notes">Notas compartilhadas</label><textarea id="ws-notes" data-field="project-notes" data-id="${p.id}">${esc(p.notes || "")}</textarea></div>
+      <div class="field"><label for="ws-scope">Escopo e aprovação</label><textarea id="ws-scope" data-field="project-scope" data-id="${p.id}">${esc(p.scope || "")}</textarea></div>
+    </div></details>
+    <div class="board-wrap"><div class="tasks-board">${TASK_STATES.map(s => `<section class="lane"><header>${s}<small>${p.tasks.filter(t => t.status === s).length}</small></header><div class="lane-body">${p.tasks.filter(t => t.status === s).map(t => `
+      <article class="task">
+        <div class="task-top">${personDot(t.owner === "Dupla" ? "" : t.owner)}<span>${esc(t.owner || "Dupla")}</span>${t.priority && t.priority !== "Normal" ? `<span class="prio p-${esc(t.priority.toLowerCase())}">${esc(t.priority)}</span>` : ""}</div>
+        <button class="task-title" data-action="edit-task" data-project="${p.id}" data-id="${t.id}" type="button">${esc(t.name)}</button>
+        ${t.description ? `<p class="task-desc">${esc(t.description)}</p>` : ""}
+        <div class="task-facts">${t.recipient ? `<span>↗ ${esc(t.recipient)}</span>` : ""}${t.deadline ? `<span>◷ ${esc(fullDate(t.deadline))}</span>` : ""}${t.delivery ? `<span>▤ ${esc(t.delivery)}</span>` : ""}</div>
+        ${t.checklist?.length ? `<details class="checklist"><summary>✓ ${t.checklist.filter(x => x.done).length}/${t.checklist.length} critérios</summary>${t.checklist.map((x, i) => `<label><input type="checkbox" data-field="criterion" data-project="${p.id}" data-id="${t.id}" data-index="${i}" ${x.done ? "checked" : ""}><span>${esc(x.text)}</span></label>`).join("")}</details>` : ""}
+        <div class="task-controls"><select data-field="task-status" data-project="${p.id}" data-id="${t.id}" aria-label="Andamento de ${esc(t.name)}">${opts(TASK_STATES, t.status)}</select></div>
+        <div class="task-actions"><button class="link" data-action="edit-task" data-project="${p.id}" data-id="${t.id}" type="button">detalhar</button><button class="link" data-action="copy-task" data-project="${p.id}" data-id="${t.id}" type="button">⧉ copiar</button></div>
+      </article>`).join("") || '<p class="lane-empty">nada aqui</p>'}</div></section>`).join("")}</div></div>
+  </section>`;
+}
+
+function libraryPage() {
+  const files = [["Proposta comercial", "Escopo e preço para mandar depois da conversa.", "modelos/proposta_comercial.docx", "📄"], ["Sequência de e-mails", "Primeiro contato, retorno, pós-conversa e cobrança.", "divulgacao/emails.md", "✉️"], ["Instagram", "Bio, legendas e como prospectar sem falar com estranhos.", "divulgacao/instagram.md", "📸"], ["Declarações", "Modelos para contratação pública.", "modelos/declaracoes_contratacao.docx", "🧾"], ["Atestado técnico", "Para o cliente emitir depois da entrega.", "modelos/atestado_capacidade_tecnica_modelo.docx", "🏅"], ["Tratamento de dados", "Termo de LGPD para os sistemas.", "modelos/termo_tratamento_dados.docx", "🔐"], ["Abrir a empresa", "Passo a passo do CNPJ sem contador.", "empresa_sem_contador.md", "🏢"]];
+  return pageHead("o arsenal", "Materiais", "Modelos e arquivos do kit para a hora de mandar proposta.") + `
+  <div class="library">${files.map(([t, d, u, e], i) => `<a class="lib-card rise" style="--i:${i}" href="kit/${u}" download><span class="lib-emoji">${e}</span><h3>${t}</h3><p>${d}</p><span class="link">baixar ↓</span></a>`).join("")}
+  <a class="lib-card rise" style="--i:8" href="#prefeituras"><span class="lib-emoji">🏛️</span><h3>Prefeituras</h3><p>79 secretarias guardadas para depois do CNPJ.</p><span class="link">abrir →</span></a>
+  <a class="lib-card rise" style="--i:9" href="plano-original.html" target="_blank" rel="noopener"><span class="lib-emoji">🗺️</span><h3>Plano original</h3><p>Rota Alto Oeste: projeção, preços e contatos.</p><span class="link">abrir ↗</span></a></div>`;
+}
+
+function authPage() {
+  if (Store.user && !Store.member) {
+    return `<section class="auth rise" style="--i:0"><div class="big-emoji">🚪</div><h1>Quase lá.</h1><p>Você entrou como <strong>${esc(Store.user.email)}</strong>, mas esse e-mail ainda não está na lista da dupla.</p><p class="hint">Peça para adicionar o e-mail na tabela <code>members</code> do Supabase.</p><button class="btn" data-action="sign-out" type="button">Sair</button></section>`;
+  }
+  return `<section class="auth rise" style="--i:0">
+    <span class="kicker">área restrita da dupla</span><h1>Entra aí 👋</h1><p>Só Kellyson e Jeyce passam daqui.</p>
+    <form id="auth-form" class="form">
+      ${input("a-email", "email", "E-mail", "", "email", true)}${input("a-password", "password", "Senha", "", "password", true)}
+      <div class="form-actions"><button class="btn primary grow" type="submit" name="mode" value="in">Entrar</button><button class="btn" type="submit" name="mode" value="up">Criar conta</button></div>
+      <p class="hint" id="auth-msg">${esc(Store.error || "")}</p>
+    </form></section>`;
 }
 
 function render() {
-    nav();
-    const r = route();
-    $("#app").innerHTML = r === "inicio" ? dashboard() : r === "projetos" ? projectPage() : r === "biblioteca" ? library() : contactsPage();
-    if ($("#home-view")) {
-        bindDashboard();
-    }
-    if ($("#rows")) {
-        fillRows();
-        bindActions($(".right-rail"));
-        $("#new-contact").onclick = () => contactForm();
-        $("#search").oninput = e => {
-            search = e.target.value;
-            page = 1;
-            fillRows();
-        };
-        $("#owner-filter").onchange = e => {
-            ownerFilter = e.target.value;
-            page = 1;
-            fillRows();
-        };
-        $("#channel-filter").onchange = e => {
-            channelFilter = e.target.value;
-            page = 1;
-            fillRows();
-        };
-        $("#prev").onclick = () => {
-            page--;
-            fillRows();
-        };
-        $("#next").onclick = () => {
-            page++;
-            fillRows();
-        };
-        document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
-            activeTab = b.dataset.tab;
-            page = 1;
-            render();
-        });
-        document.querySelectorAll("[data-metric]").forEach(b => b.onclick = () => {
-            activeTab = b.dataset.metric;
-            page = 1;
-            if (route() === "retornos") location.hash = "contatos";
-            render();
-        });
-    }
-    if ($("#new-project")) {
-        $("#new-project").onclick = () => projectForm();
-        document.querySelectorAll("[data-project-tab]").forEach(b => b.onclick = () => {
-            projectTab = b.dataset.projectTab;
-            render();
-        });
-        document.querySelectorAll("[data-project]").forEach(b => b.onclick = () => openProject(b.dataset.project));
-        if ($("#demo-project")) $("#demo-project").onclick = demoProject;
-        const selected = read("open-project", null);
-        if (selected) openProject(selected, false);
-    }
+  if (!Store.ready) {
+    $("#app").innerHTML = '<div class="loading"><span class="spinner"></span>Carregando os contatos…</div>';
+    return;
+  }
+  document.body.classList.toggle("locked", Store.mode === "cloud" && !Store.member);
+  renderChrome();
+  const r = route();
+  if (Store.mode === "cloud" && !Store.member) {
+    $("#app").innerHTML = authPage();
+    const form = $("#auth-form");
+    if (form) form.onsubmit = async e => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(form));
+      const msg = $("#auth-msg");
+      msg.textContent = "Um segundo…";
+      try {
+        if (e.submitter?.value === "up") {
+          const logged = await Store.signUp(f.email, f.password);
+          msg.textContent = logged ? "" : "Conta criada! Confirme pelo link no seu e-mail e depois entre.";
+        } else await Store.signIn(f.email, f.password);
+      } catch (err) {
+        msg.textContent = /invalid login/i.test(err.message) ? "E-mail ou senha não batem 🤔" : err.message;
+      }
+    };
+    return;
+  }
+  ui.kind = r === "prefeituras" ? "government" : "private";
+  const pages = { inicio: homePage, turbo: turboPage, contatos: contactsPage, prefeituras: contactsPage, projetos: projectsPage, materiais: libraryPage };
+  $("#app").innerHTML = (pages[r] || homePage)();
+  bindPage();
 }
 
-$("#actor").onchange = e => {
-    actor = e.target.value;
-    write("actor", actor);
-    toast("Usando como " + actor);
-};
-
-document.querySelectorAll("dialog .close").forEach(b => b.onclick = () => b.closest("dialog").close());
-
-$("#reset").onclick = () => {
-    $("#form-content").innerHTML = '<h2>Restaurar a demonstração?</h2><p>Isso apaga os testes feitos neste navegador e restaura os dados de exemplo do Miro.</p><button class="btn" id="confirm-reset">Restaurar dados de exemplo</button>';
-    $("#form-dialog").showModal();
-    $("#confirm-reset").onclick = () => {
-        [ "leads", "gov", "projects" ].forEach(k => localStorage.removeItem("rota-demo-" + k));
-        location.reload();
+function bindPage() {
+  const s = $("#search");
+  if (s) s.oninput = e => {
+    ui.search = e.target.value;
+    ui.limit = 30;
+    const pos = e.target.selectionStart;
+    render();
+    const n = $("#search");
+    n.focus();
+    n.setSelectionRange(pos, pos);
+  };
+  $$("[data-card]").forEach(card => {
+    card.ondragstart = e => { e.dataTransfer.setData("text/plain", card.dataset.card); card.classList.add("dragging"); };
+    card.ondragend = () => card.classList.remove("dragging");
+  });
+  $$(".lane[data-drop]").forEach(lane => {
+    lane.ondragover = e => { e.preventDefault(); lane.classList.add("over"); };
+    lane.ondragleave = () => lane.classList.remove("over");
+    lane.ondrop = e => {
+      e.preventDefault();
+      lane.classList.remove("over");
+      const c = byId(e.dataTransfer.getData("text/plain"));
+      const stage = STAGES.find(x => x.id === lane.dataset.stageId);
+      if (c && stage && !stage.match(c)) {
+        if (stage.drop === "Aguardando resposta") markSent(c);
+        else setStatus(c, stage.drop);
+      }
     };
+  });
+}
+
+const actions = {
+  open: el => openDrawer(el.dataset.id, el.dataset.template),
+  copy: el => {
+    const c = byId(el.dataset.id);
+    const text = el.dataset.from === "drawer" ? $("#d-msg").value : el.dataset.from === "turbo" ? $("#turbo-msg").value : messageFor(c, el.dataset.mode);
+    copy(text, "Mensagem copiada");
+  },
+  go: el => {
+    const c = byId(el.dataset.id);
+    const text = el.dataset.from === "drawer" ? $("#d-msg").value : el.dataset.from === "turbo" ? $("#turbo-msg").value : messageFor(c, el.dataset.mode);
+    copyAndOpen(c, text, el.dataset.channel);
+  },
+  sent: el => markSent(byId(el.dataset.id), el.dataset.mode),
+  "set-status": el => setStatus(byId(el.dataset.id), el.dataset.value),
+  "set-owner": el => setOwner(byId(el.dataset.id), el.dataset.value),
+  template: el => { ui.drawerTemplate = el.dataset.template; ui.drawerDraft = null; renderDrawer(); },
+  "log-reply": el => { logReply(byId(el.dataset.id), $("#d-reply").value.trim()); ui.drawerTemplate = "meet"; ui.drawerDraft = null; },
+  "return-in": el => { const c = byId(el.dataset.id); c.returnAt = addDays(Number(el.dataset.days)); Store.saveContact(c); toast(`Lembrete: retornar ${relDay(c.returnAt)} ⏰`); },
+  "edit-contact": el => editContactForm(byId(el.dataset.id)),
+  "quick-add": () => quickAddForm(),
+  "bulk-add": () => bulkAddForm(),
+  stage: el => { ui.stage = el.dataset.stage; ui.limit = 30; if (el.dataset.view) { ui.view = el.dataset.view; Store.local.write("view", ui.view); } if (route() !== "contatos" && route() !== "prefeituras") location.hash = "contatos"; else render(); },
+  view: el => { ui.view = el.dataset.view; Store.local.write("view", ui.view); render(); },
+  more: () => { ui.limit += 30; render(); },
+  "turbo-mode": el => { ui.turbo.mode = el.dataset.mode; ui.turbo.sent = 0; buildQueue(); if (route() !== "turbo") location.hash = "turbo"; else render(); },
+  "turbo-owner": el => { ui.turbo.owner = el.dataset.owner; buildQueue(); render(); },
+  "turbo-sent": () => turboAdvance("sent"),
+  "turbo-skip": () => turboAdvance("skip"),
+  "turbo-back": () => turboAdvance("back"),
+  "turbo-later": () => turboAdvance("later"),
+  "turbo-replied": () => turboAdvance("replied"),
+  goal: () => {
+    modal(`<span class="kicker">sem pressão (mas com pressão)</span><h2>Meta diária</h2><form id="goal-form" class="form"><div class="seg">${[3, 5, 10, 15].map(n => `<button type="submit" name="goal" value="${n}" class="${Number(Store.local.read("goal", 5)) === n ? "on" : ""}">${n} msgs</button>`).join("")}</div></form>`);
+    $("#goal-form").onsubmit = e => { e.preventDefault(); Store.local.write("goal", Number(e.submitter.value)); $("#modal").close(); render(); };
+  },
+  "new-project": el => projectForm(el.dataset.id ? byId(el.dataset.id) : null),
+  "demo-project": () => demoProject(),
+  "project-tab": el => { ui.projectTab = el.dataset.tab; render(); },
+  "open-project": el => {
+    ui.openProject = el.dataset.id;
+    Store.local.write("open-project", ui.openProject);
+    if (route() !== "projetos") location.hash = "projetos";
+    else { render(); $("#workspace")?.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth" }); }
+  },
+  "edit-project": el => projectForm(null, projectById(el.dataset.id)),
+  "add-task": el => taskForm(projectById(el.dataset.id)),
+  "edit-task": el => { const p = projectById(el.dataset.project); taskForm(p, p.tasks.find(t => t.id === el.dataset.id)); },
+  "copy-task": el => { const p = projectById(el.dataset.project); copy(taskText(p, p.tasks.find(t => t.id === el.dataset.id)), "Tarefa copiada"); },
+  "copy-project": el => copy(projectText(projectById(el.dataset.id)), "Projeto completo copiado"),
+  "copy-brief": el => copy(projectText(projectById(el.dataset.id), false), "Briefing copiado"),
+  "reset-demo": () => {
+    modal(`<h2>Restaurar a demonstração?</h2><p>Apaga os testes feitos neste navegador e volta aos dados do Miro.</p><div class="form-actions"><button class="btn danger" id="confirm-reset" type="button">Restaurar</button></div>`);
+    $("#confirm-reset").onclick = () => { Store.resetDemo(); ui.turbo.built = false; $("#modal").close(); toast("Tudo como novo ✨"); };
+  },
+  "sign-out": () => Store.signOut()
 };
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el || el.disabled) return;
+  const fn = actions[el.dataset.action];
+  if (!fn) return;
+  if (el.tagName === "A" && el.getAttribute("href")?.startsWith("#")) {
+    e.preventDefault();
+    const target = el.getAttribute("href").slice(1);
+    fn(el);
+    if (route() !== target && !["stage", "turbo-mode", "open-project"].includes(el.dataset.action)) location.hash = target;
+    return;
+  }
+  fn(el);
+});
+
+document.addEventListener("change", e => {
+  const el = e.target;
+  const f = el.dataset?.field;
+  if (el.id === "actor") {
+    Store.local.write("actor", el.value);
+    ui.turbo.built = false;
+    toast(`Agora você é ${el.value} 🎭`);
+    return render();
+  }
+  if (!f) return;
+  const c = el.dataset.id ? byId(el.dataset.id) : null;
+  if (f === "status") setStatus(c, el.value);
+  else if (f === "owner") setOwner(c, el.value);
+  else if (f === "owner-filter") { ui.owner = el.value; ui.limit = 30; render(); }
+  else if (f === "category-filter") { ui.category = el.value; ui.limit = 30; render(); }
+  else if (f === "turbo-category") { ui.turbo.category = el.value; buildQueue(); render(); }
+  else if (f === "returnAt" || f === "meetingAt") {
+    c[f] = el.value;
+    if (f === "meetingAt" && el.value && !["Reunião marcada", "Interessado", "Proposta enviada", "Fechado"].includes(c.status)) { setStatus(c, "Reunião marcada"); return; }
+    Store.saveContact(c);
+  } else if (f === "task-status") {
+    const p = projectById(el.dataset.project);
+    const t = p.tasks.find(x => x.id === el.dataset.id);
+    t.status = el.value;
+    Store.saveProject(p);
+    if (el.value === "Feito") toast(pick(["Tarefa feita ✓ Próxima!", "Riscou da lista. Que sensação boa 😌", "Feito! O cliente nem imagina o esforço."]));
+  } else if (f === "criterion") {
+    const p = projectById(el.dataset.project);
+    p.tasks.find(x => x.id === el.dataset.id).checklist[Number(el.dataset.index)].done = el.checked;
+    Store.saveProject(p, { silent: true });
+    const sum = el.closest("details").querySelector("summary");
+    const list = p.tasks.find(x => x.id === el.dataset.id).checklist;
+    sum.textContent = `✓ ${list.filter(x => x.done).length}/${list.length} critérios`;
+  }
+});
+
+document.addEventListener("input", e => {
+  const el = e.target;
+  const f = el.dataset?.field;
+  if (!f) return;
+  if (f === "turbo-msg") {
+    const c = byId(el.dataset.id);
+    c[el.dataset.mode] = el.value;
+    Store.saveContact(c, { debounce: true, silent: true });
+  } else if (f === "drawer-msg") {
+    const c = byId(ui.drawerId);
+    if (TEMPLATES.find(t => t.id === ui.drawerTemplate)?.stored) {
+      c[ui.drawerTemplate] = el.value;
+      Store.saveContact(c, { debounce: true, silent: true });
+    } else ui.drawerDraft = el.value;
+  } else if (f === "notes") {
+    const c = byId(el.dataset.id);
+    c.notes = el.value;
+    Store.saveContact(c, { debounce: true, silent: true });
+  } else if (f === "project-notes" || f === "project-scope") {
+    const p = projectById(el.dataset.id);
+    p[f === "project-notes" ? "notes" : "scope"] = el.value;
+    Store.saveProject(p, { debounce: true, silent: true });
+  }
+});
+
+document.addEventListener("keydown", e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+  if (e.key === "/" && !typing && $("#search")) { e.preventDefault(); $("#search").focus(); return; }
+  if (route() !== "turbo" || typing || e.ctrlKey || e.metaKey || e.altKey || $("#modal").open || $("#drawer").open) return;
+  const card = $(".turbo-card");
+  if (!card) return;
+  const k = e.key.toLowerCase();
+  if (k === "c") $('[data-action="copy"][data-from="turbo"]')?.click();
+  else if (k === "a") $(".turbo-card .chan.main")?.click();
+  else if (k === "e") turboAdvance("sent");
+  else if (e.key === "ArrowRight") turboAdvance("skip");
+  else if (e.key === "ArrowLeft") turboAdvance("back");
+  else return;
+  e.preventDefault();
+});
+
+$$("dialog .close").forEach(b => (b.onclick = () => b.closest("dialog").close()));
+$$("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+$("#drawer").addEventListener("close", () => { ui.drawerDraft = null; if (ui.pendingRender) { ui.pendingRender = false; render(); } });
+$("#quick-add-top").onclick = () => quickAddForm();
+
+function isEditing() {
+  const a = document.activeElement;
+  return a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== "checkbox";
+}
+
+Store.onChange((reason, detail) => {
+  if (reason === "error") return toast("Ops, não salvou: " + detail);
+  if (reason === "remote" && detail?.by && detail.by !== actor()) {
+    const c = detail.table === "contacts" ? byId(detail.id) : projectById(detail.id);
+    if (c) toast(`${detail.by} mexeu em ${shortName(c)} 👀`);
+  }
+  if (reason === "load" || reason === "auth") ui.turbo.built = false;
+  if ($("#drawer").open) {
+    if (isEditing() && $("#drawer").contains(document.activeElement)) { ui.pendingRender = true; return; }
+    renderDrawer();
+    ui.pendingRender = true;
+    return;
+  }
+  if (isEditing() && $("#app").contains(document.activeElement) && document.activeElement.id !== "search") { ui.pendingRender = true; return; }
+  if (route() === "turbo" && reason !== "load" && reason !== "auth") return renderChrome();
+  render();
+});
+
+document.addEventListener("focusout", () => setTimeout(() => {
+  if (ui.pendingRender && !isEditing() && !$("#drawer").open && !$("#modal").open) { ui.pendingRender = false; render(); }
+}, 0));
 
 window.addEventListener("hashchange", () => {
-    page = 1;
-    search = "";
-    ownerFilter = "Todos";
-    channelFilter = "Todos";
-    if (route() !== "contatos") activeTab = "Todos";
-    render();
-    window.scrollTo(0, 0);
+  if (route() === "turbo") buildQueue();
+  if (!["contatos", "prefeituras"].includes(route())) { ui.search = ""; }
+  render();
+  window.scrollTo(0, 0);
 });
 
 render();
-
-function dashboard() {
-    const visible = leads.filter(c => dashboardOwner === "Dupla" || c.owner === dashboardOwner), waiting = visible.filter(c => c.status === "Aguardando resposta"), meetings = visible.filter(c => c.status === "Reunião marcada"), responded = visible.filter(c => [ "Respondeu", "Reunião marcada", "Interessado", "Proposta enviada", "Fechado", "Sem interesse" ].includes(c.status)), active = projects.filter(p => p.status !== "Entregue" && (dashboardOwner === "Dupla" || p.owner === dashboardOwner || p.owner === "Dupla"));
-    const due = visible.filter(c => c.returnAt).sort((a, b) => a.returnAt.localeCompare(b.returnAt)).slice(0, 3), meeting = meetings[0];
-    const activity = visible.flatMap(c => (c.history || []).map(e => ({
-        ...e,
-        name: c.name,
-        id: c.id
-    }))).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 4);
-    return `<div id="home-view">${head("O que temos pra hoje?", "As conversas, os retornos e as entregas da dupla.", '<button class="btn" id="home-add">＋ Novo contato</button>')}\n <div class="home-command"><div class="home-greeting"><span class="eyebrow">✳ NOSSO ESPAÇO, NOSSO RITMO</span><h2>${waiting.length ? "Tem conversa esperando<br>o próximo capítulo." : "Bora fazer o dia andar."}</h2><p>${waiting.length ? `${waiting.length} contatos aguardam resposta. Um retorno bem colocado pode movimentar o dia.` : "Veja os contatos e os projetos para escolher a próxima ação."}</p><a class="btn" href="#retornos">Ver quem não respondeu <span>↗</span></a></div><div class="command-visual" aria-hidden="true"><span class="mini-orbit"></span><div class="chat-sticker"><span>FREELA EM ANDAMENTO</span><strong>oi, sumido<span class="typing">...</span></strong><small>com contexto, por favor.</small><i>↗</i></div><span class="floating-label">mensagem boa abre portas ✳</span></div></div>\n <div class="home-section-head"><h2>O movimento da dupla</h2><div class="view-switch home-owner">${[ "Dupla", "Kellyson", "Jeyce" ].map(x => `<button data-home-owner="${x}" class="${dashboardOwner === x ? "active" : ""}">${x}</button>`).join("")}</div></div>\n <div class="home-metrics">${[ [ waiting.length, "Sem resposta", "Aguardando resposta", "◷", "amber" ], [ responded.length, "Responderam", "Responderam", "↩", "violet" ], [ meetings.length, "Reuniões marcadas", "Reunião marcada", "✳", "mint" ], [ visible.filter(c => c.status === "Fechado").length, "Negócios fechados", "Fechado", "✓", "lime" ] ].map(([n, t, key, icon, color]) => `<button data-home-filter="${key}" class="home-metric ${color}"><span class="metric-symbol">${icon}</span><div><strong>${String(n).padStart(2, "0")}</strong><span>${t}</span></div><b>↗</b></button>`).join("")}</div>\n <div class="home-grid"><section class="home-panel"><div class="home-panel-head"><div><span class="eyebrow">É A VEZ DO FOLLOW-UP</span><h2>Na fila de resposta <span>${waiting.length}</span></h2></div><a href="#retornos">Ver todos ↗</a></div><div class="home-contact-list">${waiting.slice(0, 4).map((c, i) => `<article class="home-contact"><span class="company-mark tone-${i % 4}">${esc(initials(c.name))}</span><div class="home-contact-info"><button data-open="${c.id}">${esc(c.name.split(" - ")[0])}</button><small>${esc(c.channel)} · ${c.sentAt ? "enviado " + fmt(c.sentAt) : "data do envio não registrada"}</small></div><button class="btn light small" data-followup="${c.id}">Retomar ↗</button></article>`).join("") || '<div class="empty">Nenhum contato nesta fila para o filtro selecionado.</div>'}</div></section>\n <section class="home-panel home-meeting"><div class="home-panel-head"><div><span class="eyebrow">UM PASSO ALÉM DO “OI”</span><h2>${meeting ? "Reunião marcada" : "Agenda de conversas"}</h2></div><span class="calendar-icon">▦</span></div>${meeting ? `<h3>${esc(meeting.name.split(" - ")[0])}</h3><p>${meeting.meetingAt ? esc(new Date(meeting.meetingAt).toLocaleString("pt-BR")) : "O Miro já marca a reunião. Falta registrar dia e horário."}</p><div class="meeting-person"><span class="avatar">${meeting.owner ? esc(meeting.owner[0]) : "?"}</span>${esc(meeting.owner || "Responsável a definir")}</div><button class="btn light" data-open="${meeting.id}">Ver detalhes e anotar horário ↗</button>` : "<p>As reuniões marcadas aparecem aqui, com dia, horário e responsável.</p>"}</section>\n <section class="home-panel"><div class="home-panel-head"><div><span class="eyebrow">DA CONVERSA À ENTREGA</span><h2>Projetos em andamento <span>${active.length}</span></h2></div><a href="#projetos">Ver projetos ↗</a></div>${active.length ? active.slice(0, 3).map(p => `<a class="home-project" href="#projetos"><span class="company-mark">▦</span><div><strong>${esc(p.name)}</strong><small>${esc(p.owner)} · ${p.tasks.filter(t => t.status === "Feito").length}/${p.tasks.length} tarefas</small></div><span>↗</span></a>`).join("") : `<div class="project-empty"><span>▦</span><div><strong>O próximo projeto tem lugar aqui.</strong><p>Adicione um trabalho em andamento ou uma entrega já feita.</p><button class="subtle-btn" id="home-project">＋ Adicionar projeto</button></div></div>`}</section>\n <section class="home-panel"><div class="home-panel-head"><div><span class="eyebrow">PRA NÃO FICAR PRA DEPOIS</span><h2>Próximos retornos</h2></div><span>↶</span></div>${due.length ? due.map(c => `<button class="reminder" data-open="${c.id}"><span>${fmt(c.returnAt + "T12:00:00")}</span><strong>${esc(c.name.split(" - ")[0])}</strong><b>↗</b></button>`).join("") : '<p class="hint">Nenhum retorno agendado. Na ficha do contato, escolha a data em “Lembrar de retornar”.</p>'}<div class="small-aside">✳ Organização é lembrar sem depender da memória.</div></section></div>\n <section class="activity-strip"><div><span class="eyebrow">ÚLTIMAS MOVIMENTAÇÕES</span><h2>Passou por aqui.</h2></div>${activity.length ? activity.map(e => `<button data-open="${e.id}"><strong>${esc(e.name.split(" - ")[0])}</strong><span>${esc(e.text)}</span><small>${esc(e.actor)} · ${fmt(e.at)}</small></button>`).join("") : "<p>As mudanças que vocês fizerem nesta demonstração aparecem aqui.</p>"}</section></div>`;
-}
-
-function bindDashboard() {
-    bindActions($("#home-view"));
-    $("#home-add").onclick = () => contactForm();
-    if ($("#home-project")) $("#home-project").onclick = () => projectForm();
-    document.querySelectorAll("[data-home-owner]").forEach(b => b.onclick = () => {
-        dashboardOwner = b.dataset.homeOwner;
-        render();
-    });
-    document.querySelectorAll("[data-home-filter]").forEach(b => b.onclick = () => {
-        activeTab = b.dataset.homeFilter;
-        location.hash = "contatos";
-        render();
-    });
-    document.querySelectorAll("[data-followup]").forEach(b => b.onclick = () => {
-        openContact(b.dataset.followup);
-        $("#message-mode").value = "Retorno";
-        $("#message-mode").dispatchEvent(new Event("change"));
-    });
-}
+Store.init().catch(err => { Store.error = err.message; Store.ready = true; render(); });
