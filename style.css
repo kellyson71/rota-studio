@@ -381,7 +381,7 @@ details p { font-size: 14px; color: var(--ink-2); }
 
 .modal { width: min(680px, calc(100% - 24px)); max-height: calc(100vh - 48px); border-radius: 22px; box-shadow: var(--shadow-lg); overflow-y: auto; }
 dialog:not([open]) { display: none !important; }
-.modal[open] { display: block; height: auto; min-height: 120px; }
+.modal[open] { display: block; height: fit-content; min-height: 120px; }
 .modal[open] { animation: pop .3s var(--ease); }
 #modal-content { padding: 28px; }
 #modal-content h2 { font: 800 28px/1.1 var(--display); letter-spacing: -1px; margin: 6px 0 16px; padding-right: 40px; }
