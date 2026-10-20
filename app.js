@@ -1002,7 +1002,6 @@ function taskToolbar(p) {
   return `<div class="task-toolbar">
     <div class="ws-progress"><div class="meter thin"><div style="width:${pct}%"></div></div><span><b>${done}/${p.tasks.length}</b> feitas · ${pct}%${late ? ` · <em class="late-count">${late} atrasada${late > 1 ? "s" : ""}</em>` : ""}</span></div>
     <div class="seg small" role="group" aria-label="Filtrar tarefas por responsável">${["Todos", "Kellyson", "Jeyce", "Dupla"].map(o => `<button class="${ui.taskOwner === o ? "on" : ""}" data-action="task-owner" data-owner="${o}" type="button">${o === "Todos" ? "Todos" : personDot(o === "Dupla" ? "" : o) + o}</button>`).join("")}</div>
-    <span class="hint drag-hint">Arraste os cartões entre as colunas</span>
   </div>`;
 }
 
@@ -1072,12 +1071,12 @@ function initBoards() {
       scrollSensitivity: 90,
       scrollSpeed: 14,
       bubbleScroll: true,
-      filter: "button, input, select, textarea, summary, label, a, .select-wrap",
+      filter: "input, select, textarea, summary, label, a, .select-wrap, .task-actions, .task-controls",
       preventOnFilter: false,
       onChoose: () => window.getSelection()?.removeAllRanges(),
       onStart: () => { window.getSelection()?.removeAllRanges(); document.body.classList.add("dragging-task"); },
       onMove: evt => { $$(".lane.drop-target").forEach(l => l.classList.remove("drop-target")); evt.to.closest(".lane")?.classList.add("drop-target"); },
-      onEnd: () => { document.body.classList.remove("dragging-task"); $$(".lane.drop-target").forEach(l => l.classList.remove("drop-target")); window.getSelection()?.removeAllRanges(); syncBoard(p); }
+      onEnd: () => { ui.dragEndAt = Date.now(); document.body.classList.remove("dragging-task"); $$(".lane.drop-target").forEach(l => l.classList.remove("drop-target")); window.getSelection()?.removeAllRanges(); syncBoard(p); }
     });
   });
   const grid = $(".projects-grid");
@@ -1262,7 +1261,11 @@ const actions = {
   },
   "edit-project": el => projectForm(null, projectById(el.dataset.id)),
   "add-task": el => taskForm(projectById(el.dataset.id)),
-  "edit-task": el => { const p = projectById(el.dataset.project); taskForm(p, p.tasks.find(t => t.id === el.dataset.id)); },
+  "edit-task": el => {
+    if (Date.now() - (ui.dragEndAt || 0) < 300) return;
+    const p = projectById(el.dataset.project);
+    taskForm(p, p.tasks.find(t => t.id === el.dataset.id));
+  },
   "copy-task": el => { const p = projectById(el.dataset.project); copy(taskText(p, p.tasks.find(t => t.id === el.dataset.id)), "Tarefa copiada"); },
   "copy-project": el => copy(projectText(projectById(el.dataset.id)), "Projeto completo copiado"),
   "copy-brief": el => copy(projectText(projectById(el.dataset.id), false), "Briefing copiado"),

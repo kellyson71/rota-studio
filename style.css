@@ -609,7 +609,6 @@ dialog:not([open]) { display: none !important; }
 .quick-task input:focus { outline: none; border-style: solid; border-color: var(--ink); background: var(--paper); }
 .lane-3 > header { color: #3b7a1f; }
 .project-card { cursor: grab; }
-@media (max-width: 860px) { .drag-hint { display: none; } }
 @media (hover: hover) and (pointer: fine) {
   .task .task-controls { display: none; }
   .task { position: relative; }
