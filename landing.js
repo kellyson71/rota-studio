@@ -196,7 +196,6 @@ const SYSTEMS = [
   const inner = SYSTEMS.filter(x => x.kind === "pub");
   const outer = SYSTEMS.filter(x => x.kind === "priv");
   const planet = (x, angle, r, i) => `
-    <div class="beam" data-id="${x.id}" style="--a:${angle}deg;--r:${r}cqw;--c:var(--${x.kind === "pub" ? "b" : "g"})"></div>
     <div class="planet ${x.kind}" data-id="${x.id}" style="--a:${angle}deg;--r:${r}cqw;--delay:${(0.35 + i * 0.12).toFixed(2)}s">
       <div class="p-face"><button class="p-btn" type="button" data-id="${x.id}" aria-label="${esc(x.name)}, ${esc(x.client)}, desde ${x.year}"><img src="assets/logos/${x.logo}.webp" alt="" width="60" height="60"><small>${esc(x.name)}</small></button></div>
     </div>`;
@@ -209,11 +208,13 @@ const SYSTEMS = [
 
 const orbitEl = $("#orbit");
 let pinned = null;
+let focusedId = null;
 function focusSystem(id) {
+  focusedId = id || null;
   const x = SYSTEMS.find(s => s.id === id);
   orbitEl.classList.toggle("paused", Boolean(x));
   orbitEl.classList.toggle("focus", Boolean(x));
-  $$(".planet, .beam, .o-chip").forEach(el => el.classList.toggle("on", Boolean(x) && el.dataset.id === id));
+  $$(".planet, .o-chip").forEach(el => el.classList.toggle("on", Boolean(x) && el.dataset.id === id));
   const card = $("#o-card");
   if (x) card.innerHTML = `<strong>${esc(x.name)}<em class="${x.kind}">${x.kind === "pub" ? "público" : "privado"}</em></strong><span>${esc(x.client)}</span><span class="since">No ar desde ${x.year}</span>`;
   card.classList.toggle("on", Boolean(x));
@@ -235,44 +236,91 @@ new IntersectionObserver((entries, obs) => {
   obs.disconnect();
 }, { threshold: 0.3 }).observe(orbitEl);
 
-if (fine) {
+{
   const stage = $("#orbit-stage");
+  stage.insertAdjacentHTML("afterbegin", '<svg class="tether" aria-hidden="true"><path d=""/></svg>');
+  const tether = $(".tether", stage);
+  const path = $("path", tether);
+  const core = $(".core", stage);
   const btns = $$(".p-btn");
-  const state = new Map(btns.map(b => [b, { x: 0, y: 0, s: 0 }]));
+  const state = new Map(btns.map(b => [b, { x: 0, y: 0, s: 0, px: 0, py: 0 }]));
   const RANGE = 130;
   const GRAB = 64;
+  const ctrl = { x: 0, y: 0, vx: 0, vy: 0, init: false };
   let mouse = null;
   let current = null;
-  stage.addEventListener("mousemove", e => { mouse = { x: e.clientX, y: e.clientY }; });
-  stage.addEventListener("mouseleave", () => { mouse = null; });
-  (function magnet() {
+  if (fine) {
+    stage.addEventListener("mousemove", e => { mouse = { x: e.clientX, y: e.clientY }; });
+    stage.addEventListener("mouseleave", () => { mouse = null; });
+  }
+  (function loop() {
     let nearest = null;
     let best = Infinity;
+    const bases = new Map();
     btns.forEach(b => {
       const st = state.get(b);
       const r = b.getBoundingClientRect();
-      const cx = r.left + r.width / 2 - st.x;
-      const cy = r.top + r.height / 2 - st.y;
-      let tx = 0, ty = 0, ts = 0;
+      const base = { x: r.left + r.width / 2 - st.x, y: r.top + r.height / 2 - st.y };
+      bases.set(b, base);
       if (mouse) {
-        const dx = mouse.x - cx, dy = mouse.y - cy;
-        const d = Math.hypot(dx, dy);
-        if (d < RANGE) {
-          const k = Math.pow(1 - d / RANGE, 1.6);
-          tx = dx * (0.25 + 0.65 * k);
-          ty = dy * (0.25 + 0.65 * k);
-          ts = k;
-          if (d < best) { best = d; nearest = b; }
-        }
+        const d = Math.hypot(mouse.x - base.x, mouse.y - base.y);
+        if (d < RANGE && d < best) { best = d; nearest = b; }
       }
-      st.x += (tx - st.x) * 0.16;
-      st.y += (ty - st.y) * 0.16;
-      st.s += (ts - st.s) * 0.16;
-      b.style.transform = `translate(${st.x.toFixed(2)}px, ${st.y.toFixed(2)}px) scale(${(1 + st.s * 0.22).toFixed(3)})`;
     });
-    const id = nearest && best < GRAB ? nearest.dataset.id : null;
-    if (id !== current && !pinned) { current = id; focusSystem(id); stage.style.cursor = id ? "pointer" : ""; }
-    requestAnimationFrame(magnet);
+    btns.forEach(b => {
+      const st = state.get(b);
+      let tx = 0, ty = 0, ts = 0;
+      if (b === nearest && !reduce) {
+        const base = bases.get(b);
+        const dx = mouse.x - base.x, dy = mouse.y - base.y;
+        const k = Math.pow(1 - best / RANGE, 1.4);
+        tx = dx * (0.3 + 0.62 * k);
+        ty = dy * (0.3 + 0.62 * k);
+        ts = k;
+      }
+      const ox = st.x, oy = st.y;
+      st.x += (tx - st.x) * 0.15;
+      st.y += (ty - st.y) * 0.15;
+      st.s += (ts - st.s) * 0.15;
+      const vx = st.x - ox, vy = st.y - oy;
+      const disp = Math.hypot(st.x, st.y);
+      const vel = Math.hypot(vx, vy);
+      const stretch = Math.min(0.32, disp * 0.0022 + vel * 0.035);
+      const ang = Math.atan2(vel > 0.4 ? vy : st.y, vel > 0.4 ? vx : st.x) * 180 / Math.PI;
+      const grow = 1 + st.s * 0.2;
+      if (disp < 0.05 && st.s < 0.002) { b.style.transform = ""; return; }
+      b.style.transform = `translate(${st.x.toFixed(2)}px, ${st.y.toFixed(2)}px) rotate(${ang.toFixed(1)}deg) scale(${(grow + stretch).toFixed(3)}, ${(grow - stretch * 0.55).toFixed(3)}) rotate(${(-ang).toFixed(1)}deg)`;
+    });
+    if (fine) {
+      const id = nearest && best < GRAB ? nearest.dataset.id : null;
+      if (id !== current && !pinned) { current = id; focusSystem(id); stage.style.cursor = id ? "pointer" : ""; }
+    }
+    const target = focusedId ? $(`.p-btn[data-id="${focusedId}"]`) : null;
+    if (target) {
+      const sr = stage.getBoundingClientRect();
+      const cr = core.getBoundingClientRect();
+      const tr = target.getBoundingClientRect();
+      const st = state.get(target);
+      const a = { x: cr.left + cr.width / 2 - sr.left, y: cr.top + cr.height / 2 - sr.top };
+      const z = { x: tr.left + tr.width / 2 - sr.left, y: tr.top + tr.height / 2 - sr.top };
+      const mid = { x: (a.x + z.x) / 2, y: (a.y + z.y) / 2 };
+      const len = Math.hypot(z.x - a.x, z.y - a.y) || 1;
+      const nx = -(z.y - a.y) / len, ny = (z.x - a.x) / len;
+      const sway = (st.x * nx + st.y * ny);
+      const goal = { x: mid.x - nx * sway * 1.8 + nx * 14, y: mid.y - ny * sway * 1.8 + ny * 14 };
+      if (!ctrl.init) { ctrl.x = goal.x; ctrl.y = goal.y; ctrl.init = true; }
+      ctrl.vx = (ctrl.vx + (goal.x - ctrl.x) * 0.07) * 0.86;
+      ctrl.vy = (ctrl.vy + (goal.y - ctrl.y) * 0.07) * 0.86;
+      ctrl.x += ctrl.vx;
+      ctrl.y += ctrl.vy;
+      path.setAttribute("d", `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${z.x.toFixed(1)} ${z.y.toFixed(1)}`);
+      tether.dataset.kind = target.closest(".planet").classList.contains("priv") ? "priv" : "pub";
+      tether.classList.add("on");
+    } else {
+      tether.classList.remove("on");
+      ctrl.init = false;
+    }
+    requestAnimationFrame(loop);
   })();
 }
 
