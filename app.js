@@ -843,7 +843,8 @@ function editContactForm(c) {
   };
 }
 
-function modal(html) {
+function modal(html, cls = "") {
+  $("#modal").className = "modal" + (cls ? " " + cls : "");
   $("#modal-content").innerHTML = html;
   if (!$("#modal").open) $("#modal").showModal();
 }
@@ -1023,6 +1024,111 @@ function taskCard(p, t) {
 function taskLane(p, st) {
   const visible = p.tasks.filter(t => t.status === st && (ui.taskOwner === "Todos" || (t.owner || "Dupla") === ui.taskOwner));
   return `<section class="lane lane-${TASK_STATES.indexOf(st)}"><header>${st}<small>${p.tasks.filter(t => t.status === st).length}</small></header><div class="lane-body" data-status="${st}" data-project="${p.id}">${visible.map(t => taskCard(p, t)).join("")}</div><form class="quick-task" data-project="${p.id}" data-status="${st}"><input name="name" placeholder="＋ Adicionar tarefa" aria-label="Nova tarefa em ${st}" autocomplete="off" maxlength="140"></form></section>`;
+}
+
+const TASK_TONES = { "A fazer": "new", "Fazendo": "wait", "Em revisão": "reply", "Feito": "win" };
+
+function linkList(raw) {
+  return String(raw || "").split(/\s+/).map(x => x.trim()).filter(Boolean).map(u => safeUrl(u.startsWith("http") ? u : "https://" + u)).filter(Boolean);
+}
+
+function taskModal(p, t, fresh = false) {
+  const created = t.createdAt ? new Date(t.createdAt).toLocaleDateString("pt-BR") : "";
+  const updated = t.updatedAt ? ago(t.updatedAt) : "";
+  const done = (t.checklist || []).filter(x => x.done).length;
+  const total = (t.checklist || []).length;
+  modal(`
+  <div class="tm" data-project="${p.id}" data-task="${t.id}">
+    <header class="tm-head">
+      <span class="kicker">${esc(p.name)} · tarefa</span>
+      <textarea class="tm-title" rows="1" data-tm="name" placeholder="Nome da tarefa" aria-label="Nome da tarefa">${esc(t.name)}</textarea>
+      <div class="tm-status" role="group" aria-label="Etapa">${TASK_STATES.map(st => `<button type="button" class="st-btn tone-${TASK_TONES[st]} ${t.status === st ? "on" : ""}" data-tm-status="${esc(st)}" aria-pressed="${t.status === st}"><b>${["○", "◔", "◈", "✓"][TASK_STATES.indexOf(st)]}</b>${esc(st)}</button>`).join("")}</div>
+    </header>
+    <div class="tm-body">
+      <div class="tm-main">
+        <section><h3>Descrição</h3><textarea class="tm-area" data-tm="description" rows="3" placeholder="O que precisa ser feito e por quê. Dá para colar direto no agente.">${esc(t.description || "")}</textarea></section>
+        <section>
+          <h3>Checklist <small id="tm-check-count">${total ? `${done}/${total}` : ""}</small></h3>
+          ${total ? `<div class="check-bar tm-bar"><i style="width:${(done / total) * 100}%"></i></div>` : ""}
+          <ul class="tm-check" id="tm-check">${(t.checklist || []).map((x, i) => `<li class="${x.done ? "done" : ""}"><label><input type="checkbox" data-tm-check="${i}" ${x.done ? "checked" : ""}><span>${esc(x.text)}</span></label><button type="button" class="tm-x" data-tm-remove="${i}" aria-label="Remover item">×</button></li>`).join("")}</ul>
+          <input class="tm-add" id="tm-add" placeholder="＋ Adicionar item e apertar Enter" aria-label="Novo item do checklist" maxlength="200">
+        </section>
+        <section><h3>Links e referências</h3>
+          <div class="tm-links">${linkList(t.links).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, "").slice(0, 48))} ↗</a>`).join("")}</div>
+          <textarea class="tm-area small" data-tm="links" rows="2" placeholder="Cole links separados por espaço ou linha">${esc(t.links || "")}</textarea>
+        </section>
+        <section><h3>Notas e combinados</h3><textarea class="tm-area" data-tm="notes" rows="3" placeholder="Decisões, pedidos do cliente, o que falta confirmar.">${esc(t.notes || "")}</textarea></section>
+      </div>
+      <aside class="tm-side">
+        <div class="tm-field"><span>Responsável</span><div class="tm-people">${["Kellyson", "Jeyce", "Dupla"].map(o => `<button type="button" class="${(t.owner || "Dupla") === o ? "on" : ""}" data-tm-owner="${o}">${personDot(o === "Dupla" ? "" : o)}${o}</button>`).join("")}</div></div>
+        <div class="tm-field"><span>Prioridade</span><div class="tm-prio">${["Baixa", "Normal", "Alta", "Urgente"].map(o => `<button type="button" class="p-${o.toLowerCase()} ${(t.priority || "Normal") === o ? "on" : ""}" data-tm-prio="${o}">${o}</button>`).join("")}</div></div>
+        <label class="tm-field"><span>Prazo</span><input type="date" data-tm="deadline" value="${esc(t.deadline || "")}"></label>
+        <label class="tm-field"><span>Para quem</span><input data-tm="recipient" value="${esc(t.recipient || p.client || "")}" placeholder="Cliente ou setor"></label>
+        <label class="tm-field"><span>Entrega esperada</span><input data-tm="delivery" value="${esc(t.delivery || "")}" placeholder="Ex.: tela publicada"></label>
+        <div class="tm-actions">
+          <button type="button" class="btn small" data-tm-copy>⧉ Copiar tarefa</button>
+          <button type="button" class="btn small danger" data-tm-delete>Excluir</button>
+        </div>
+        <p class="tm-meta"><span id="tm-saved">Salva sozinha</span>${created ? `<br>Criada em ${esc(created)}` : ""}${updated ? ` · editada ${esc(updated)}` : ""}</p>
+      </aside>
+    </div>
+  </div>`, "wide");
+  const root = $(".tm");
+  const title = $(".tm-title", root);
+  const grow = el => { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; };
+  $$("textarea", root).forEach(grow);
+  const saved = () => { const el = $("#tm-saved"); if (el) { el.textContent = "Salvo ✓"; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = "Salva sozinha"; }, 1400); } };
+  const commit = (debounce = true) => { t.updatedAt = now(); p.updatedAt = now(); Store.saveProject(p, { debounce, silent: true }); saved(); };
+  root.addEventListener("input", e => {
+    const key = e.target.dataset.tm;
+    if (!key) return;
+    if (e.target.tagName === "TEXTAREA") grow(e.target);
+    t[key] = e.target.value;
+    if (key === "links") $(".tm-links", root).innerHTML = linkList(t.links).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, "").slice(0, 48))} ↗</a>`).join("");
+    commit();
+  });
+  title.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); title.blur(); } });
+  root.addEventListener("click", e => {
+    const st = e.target.closest("[data-tm-status]");
+    const ow = e.target.closest("[data-tm-owner]");
+    const pr = e.target.closest("[data-tm-prio]");
+    const rm = e.target.closest("[data-tm-remove]");
+    if (st) { t.status = st.dataset.tmStatus; $$("[data-tm-status]", root).forEach(b => { b.classList.toggle("on", b === st); b.setAttribute("aria-pressed", b === st); }); commit(false); if (t.status === "Feito") toast("Tarefa feita. Próxima!"); }
+    if (ow) { t.owner = ow.dataset.tmOwner; $$("[data-tm-owner]", root).forEach(b => b.classList.toggle("on", b === ow)); commit(false); }
+    if (pr) { t.priority = pr.dataset.tmPrio; $$("[data-tm-prio]", root).forEach(b => b.classList.toggle("on", b === pr)); commit(false); }
+    if (rm) { t.checklist.splice(Number(rm.dataset.tmRemove), 1); commit(false); taskModal(p, t); }
+    if (e.target.closest("[data-tm-copy]")) copy(taskText(p, t), "Tarefa copiada");
+    if (e.target.closest("[data-tm-delete]")) {
+      const snap = JSON.parse(JSON.stringify(t));
+      const index = p.tasks.indexOf(t);
+      p.tasks = p.tasks.filter(x => x !== t);
+      Store.saveProject(p);
+      $("#modal").close();
+      toast("Tarefa excluída", () => { p.tasks.splice(index, 0, snap); Store.saveProject(p); });
+    }
+  });
+  root.addEventListener("change", e => {
+    const i = e.target.dataset.tmCheck;
+    if (i === undefined) return;
+    t.checklist[Number(i)].done = e.target.checked;
+    e.target.closest("li").classList.toggle("done", e.target.checked);
+    const d = t.checklist.filter(x => x.done).length;
+    $("#tm-check-count").textContent = `${d}/${t.checklist.length}`;
+    const bar = $(".tm-bar i", root);
+    if (bar) bar.style.width = (d / t.checklist.length) * 100 + "%";
+    commit(false);
+  });
+  $("#tm-add").addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const text = e.target.value.trim();
+    if (!text) return;
+    t.checklist = [...(t.checklist || []), { text, done: false }];
+    commit(false);
+    taskModal(p, t);
+    $("#tm-add").focus();
+  });
+  if (fresh) title.focus();
 }
 
 function syncBoard(p) {
@@ -1260,11 +1366,17 @@ const actions = {
     else { render(); $("#workspace")?.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth" }); }
   },
   "edit-project": el => projectForm(null, projectById(el.dataset.id)),
-  "add-task": el => taskForm(projectById(el.dataset.id)),
+  "add-task": el => {
+    const p = projectById(el.dataset.id);
+    const t = { id: "t-" + uid(), name: "", owner: ui.taskOwner !== "Todos" ? ui.taskOwner : actor(), status: "A fazer", priority: "Normal", checklist: [], createdAt: now() };
+    p.tasks.push(t);
+    Store.saveProject(p, { silent: true });
+    taskModal(p, t, true);
+  },
   "edit-task": el => {
     if (Date.now() - (ui.dragEndAt || 0) < 300) return;
     const p = projectById(el.dataset.project);
-    taskForm(p, p.tasks.find(t => t.id === el.dataset.id));
+    taskModal(p, p.tasks.find(t => t.id === el.dataset.id));
   },
   "copy-task": el => { const p = projectById(el.dataset.project); copy(taskText(p, p.tasks.find(t => t.id === el.dataset.id)), "Tarefa copiada"); },
   "copy-project": el => copy(projectText(projectById(el.dataset.id)), "Projeto completo copiado"),
@@ -1327,6 +1439,16 @@ document.addEventListener("change", e => {
   }
 });
 
+document.addEventListener("click", e => {
+  const card = e.target.closest(".task[data-task]");
+  if (!card || e.target.closest("button, a, input, select, textarea, label, summary, .select-wrap")) return;
+  if (Date.now() - (ui.dragEndAt || 0) < 300) return;
+  const body = card.closest(".lane-body");
+  const p = projectById(body?.dataset.project);
+  const t = p?.tasks.find(x => x.id === card.dataset.task);
+  if (t) taskModal(p, t);
+});
+
 document.addEventListener("submit", e => {
   const form = e.target.closest(".quick-task");
   if (!form) return;
@@ -1386,6 +1508,16 @@ document.addEventListener("keydown", e => {
 
 $$("dialog .close").forEach(b => (b.onclick = () => b.closest("dialog").close()));
 $$("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+$("#modal").addEventListener("close", () => {
+  const tm = $(".tm");
+  if (!tm) return;
+  const p = projectById(tm.dataset.project);
+  const t = p?.tasks.find(x => x.id === tm.dataset.task);
+  if (p && t && !t.name.trim()) { p.tasks = p.tasks.filter(x => x !== t); Store.saveProject(p, { silent: true }); }
+  if (p) Store.saveProject(p, { silent: true });
+  $("#modal").className = "modal";
+  if (route() === "projetos") render();
+});
 $("#drawer").addEventListener("close", () => { ui.drawerDraft = null; if (ui.pendingRender) { ui.pendingRender = false; render(); } });
 $("#quick-add-top").onclick = () => quickAddForm();
 
