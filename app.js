@@ -1057,7 +1057,7 @@ function initBoards() {
   $$(".lane-body[data-status]").forEach(body => {
     Sortable.create(body, {
       group: "tasks-" + p.id,
-      animation: 180,
+      animation: 220,
       easing: "cubic-bezier(.2, .8, .2, 1)",
       ghostClass: "task-ghost",
       chosenClass: "task-chosen",
@@ -1065,11 +1065,19 @@ function initBoards() {
       delay: 160,
       delayOnTouchOnly: true,
       forceFallback: true,
-      fallbackTolerance: 4,
+      fallbackOnBody: true,
+      fallbackTolerance: 5,
+      swapThreshold: 0.6,
+      scroll: true,
+      scrollSensitivity: 90,
+      scrollSpeed: 14,
+      bubbleScroll: true,
       filter: "button, input, select, textarea, summary, label, a, .select-wrap",
       preventOnFilter: false,
-      onStart: () => document.body.classList.add("dragging-task"),
-      onEnd: () => { document.body.classList.remove("dragging-task"); syncBoard(p); }
+      onChoose: () => window.getSelection()?.removeAllRanges(),
+      onStart: () => { window.getSelection()?.removeAllRanges(); document.body.classList.add("dragging-task"); },
+      onMove: evt => { $$(".lane.drop-target").forEach(l => l.classList.remove("drop-target")); evt.to.closest(".lane")?.classList.add("drop-target"); },
+      onEnd: () => { document.body.classList.remove("dragging-task"); $$(".lane.drop-target").forEach(l => l.classList.remove("drop-target")); window.getSelection()?.removeAllRanges(); syncBoard(p); }
     });
   });
   const grid = $(".projects-grid");
