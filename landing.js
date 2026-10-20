@@ -510,6 +510,17 @@ document.addEventListener("click", e => {
   layout();
 })();
 
+fetch("metricas.json").then(r => (r.ok ? r.json() : null)).then(data => {
+  if (!data || !data.metrics) return;
+  window.METRICS = data.metrics;
+  Object.entries(data.metrics).forEach(([id, list]) => {
+    const info = document.querySelector(`#toc-${id} .toc-info`);
+    if (info) info.insertAdjacentHTML("afterbegin", `<div class="metrics">${list.map(([v, l]) => `<div><strong>${esc(v)}</strong><span>${esc(l)}</span></div>`).join("")}</div><p class="as-of">${esc(data.asOf || "")}</p>`);
+  });
+  document.querySelectorAll("#toc > li.open .toc-panel").forEach(p => { p.style.height = "auto"; });
+  if (hasGsap) ScrollTrigger.refresh();
+}).catch(() => {});
+
 fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
   if (!data) return;
   const f = data.featured;
@@ -517,14 +528,6 @@ fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
   $("#voices").innerHTML = `<article class="v-featured"><div><blockquote>${esc(f.quote)}</blockquote>${who(f)}</div><div class="v-stat"><strong>${esc(f.stat)}</strong><span>${esc(f.statLabel)}</span></div></article>` +
     data.items.map(x => `<article class="v-card" style="--c:var(--${x.color})"><div><span class="mark ${x.color}" aria-hidden="true">“</span><blockquote>${esc(x.quote)}</blockquote></div>${who(x)}</article>`).join("");
   $("#depoimentos").hidden = false;
-  if (data.metrics) {
-    window.METRICS = data.metrics;
-    Object.entries(data.metrics).forEach(([id, list]) => {
-      const info = document.querySelector(`#toc-${id} .toc-info`);
-      if (info) info.insertAdjacentHTML("afterbegin", `<div class="metrics">${list.map(([v, l]) => `<div><strong>${esc(v)}</strong><span>${esc(l)}</span></div>`).join("")}</div><p class="as-of">${esc(data.asOf || "")}</p>`);
-    });
-    document.querySelectorAll("#toc > li.open .toc-panel").forEach(p => { p.style.height = "auto"; });
-  }
   if (hasGsap && !reduce) {
     gsap.from(".v-featured, .v-card", { y: 60, opacity: 0, duration: 0.9, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: "#voices", start: "top 85%" } });
     ScrollTrigger.refresh();

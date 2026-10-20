@@ -39,6 +39,7 @@ jobs:
           cp index.html painel.html privacidade.html termos.html landing.css landing.js style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
           cp -R kit dist/kit
           cp -R assets dist/assets
+          cp metricas.json dist/
       - name: Configurar Pages
         uses: actions/configure-pages@v5
       - name: Enviar arquivos
