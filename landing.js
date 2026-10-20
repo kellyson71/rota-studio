@@ -184,53 +184,65 @@ if (fine && !reduce) {
 }
 
 const SYSTEMS = [
-  { name: "DEMUTRAN", client: "Departamento de Trânsito · Pau dos Ferros", kind: "pub", year: 2024, logo: "demutran" },
-  { name: "SEMA", client: "Secretaria de Meio Ambiente · Pau dos Ferros", kind: "pub", year: 2025, logo: "brasao" },
-  { name: "Protocolo SEAD", client: "Secretaria de Administração · Pau dos Ferros", kind: "pub", year: 2025, logo: "sead" },
-  { name: "SECOM", client: "Secretaria de Comunicação · Pau dos Ferros", kind: "pub", year: 2026, logo: "brasao" },
-  { name: "Estágio PdF", client: "Secretaria de Administração · Pau dos Ferros", kind: "pub", year: 2026, logo: "sead" },
-  { name: "Integral Clínica", client: "Fisioterapia e estética", kind: "priv", year: 2026, logo: "integral" },
-  { name: "VFIK", client: "Projetos e construções", kind: "priv", year: 2026, logo: "vfik" }
+  { id: "sema", name: "SEMA", client: "Secretaria de Meio Ambiente", kind: "pub", year: 2025, logo: "brasao" },
+  { id: "demutran", name: "DEMUTRAN", client: "Departamento de Trânsito", kind: "pub", year: 2024, logo: "demutran" },
+  { id: "protocolo", name: "Protocolo SEAD", client: "Secretaria de Administração", kind: "pub", year: 2025, logo: "sead" },
+  { id: "secom", name: "SECOM", client: "Secretaria de Comunicação", kind: "pub", year: 2026, logo: "brasao" },
+  { id: "estagio", name: "Estágio PdF", client: "Secretaria de Administração", kind: "pub", year: 2026, logo: "sead" },
+  { id: "integral", name: "Integral Clínica", client: "Fisioterapia e estética", kind: "priv", year: 2026, logo: "integral" },
+  { id: "vfik", name: "VFIK", client: "Projetos e construções", kind: "priv", year: 2026, logo: "vfik" }
 ];
-const YEARS = [2024, 2025, 2026];
-$("#growth-cols").innerHTML = YEARS.map(y => {
-  const total = SYSTEMS.filter(x => x.year <= y).length;
-  const items = SYSTEMS.filter(x => x.year === y);
-  return `<div class="col"><div class="col-total"><strong data-total="${total}">${total}</strong><small>${y === 2024 ? "no ar" : "+" + items.length}</small></div><div class="stack">${items.map(x => `<div class="block ${x.kind}" tabindex="0" data-client="${esc(x.client)}" aria-label="${esc(x.name)}, ${x.year}, ${esc(x.client)}"><img src="assets/logos/${x.logo}.webp" alt="" width="42" height="42"><span>${esc(x.name)}</span></div>`).join("")}</div></div>`;
-}).join("");
-$("#growth-chart").insertAdjacentHTML("beforeend", `<div class="years" aria-hidden="true">${YEARS.map(y => `<span>${y}</span>`).join("")}</div>`);
+(function buildOrbit() {
+  const inner = SYSTEMS.filter(x => x.kind === "pub");
+  const outer = SYSTEMS.filter(x => x.kind === "priv");
+  const planet = (x, angle, r, i) => `
+    <div class="beam" data-id="${x.id}" style="--a:${angle}deg;--r:${r}cqw;--c:var(--${x.kind === "pub" ? "b" : "g"})"></div>
+    <div class="planet ${x.kind}" data-id="${x.id}" style="--a:${angle}deg;--r:${r}cqw;--delay:${(0.35 + i * 0.12).toFixed(2)}s">
+      <div class="p-face"><button class="p-btn" type="button" data-id="${x.id}" aria-label="${esc(x.name)}, ${esc(x.client)}, desde ${x.year}"><img src="assets/logos/${x.logo}.webp" alt="" width="60" height="60"><small>${esc(x.name)}</small></button></div>
+    </div>`;
+  $("#spin-in").innerHTML = inner.map((x, i) => planet(x, -90 + i * (360 / inner.length), 28, i)).join("");
+  $("#spin-out").innerHTML = outer.map((x, i) => planet(x, 200 + i * 180, 42, inner.length + i)).join("");
+  $("#o-groups").innerHTML = [["pub", "Setor público", "b", "5 sistemas · 4 órgãos"], ["priv", "Empresas", "g", "2 sistemas · 2 empresas"]].map(([k, t, c, sub]) => `
+    <div class="o-group"><h3><i style="background:var(--${c})"></i>${t}<span>${sub}</span></h3>
+    <div class="o-chips">${SYSTEMS.filter(x => x.kind === k).map(x => `<button class="o-chip ${k}" type="button" data-id="${x.id}"><img src="assets/logos/${x.logo}.webp" alt="" width="28" height="28">${esc(x.name)}</button>`).join("")}</div></div>`).join("");
+})();
 
-$$(".col").forEach((col, i) => {
-  const base = 0.35 + i * 0.6;
-  $$(".block", col).forEach((bl, k) => bl.style.setProperty("--d", (base + k * 0.13).toFixed(2) + "s"));
-  col.style.setProperty("--td", (base + $$(".block", col).length * 0.13 + 0.45).toFixed(2) + "s");
+const orbitEl = $("#orbit");
+let pinned = null;
+function focusSystem(id) {
+  const x = SYSTEMS.find(s => s.id === id);
+  orbitEl.classList.toggle("paused", Boolean(x));
+  orbitEl.classList.toggle("focus", Boolean(x));
+  $$(".planet, .beam, .o-chip").forEach(el => el.classList.toggle("on", Boolean(x) && el.dataset.id === id));
+  const card = $("#o-card");
+  if (x) card.innerHTML = `<strong>${esc(x.name)}<em class="${x.kind}">${x.kind === "pub" ? "público" : "privado"}</em></strong><span>${esc(x.client)}</span><span class="since">No ar desde ${x.year}</span>`;
+  card.classList.toggle("on", Boolean(x));
+}
+$$("[data-id].p-btn, .o-chip").forEach(el => {
+  el.addEventListener("mouseenter", () => { if (fine) focusSystem(el.dataset.id); });
+  el.addEventListener("mouseleave", () => { if (fine && !pinned) focusSystem(null); else if (fine && pinned) focusSystem(pinned); });
+  el.addEventListener("focus", () => focusSystem(el.dataset.id));
+  el.addEventListener("blur", () => { if (!pinned) focusSystem(null); });
+  el.addEventListener("click", () => { pinned = pinned === el.dataset.id ? null : el.dataset.id; focusSystem(pinned); });
 });
-
-function countUp(el, from, to, ms) {
-  const start = performance.now();
-  (function step(t) {
-    const k = Math.min(1, (t - start) / ms);
-    el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
-    if (k < 1) requestAnimationFrame(step);
-  })(start);
-}
-
-function dropBlocks() {
-  const chart = $("#growth-chart");
-  if (chart.classList.contains("go")) return;
-  chart.classList.add("go");
-  if (reduce) return;
-  const totals = $$(".col-total strong");
-  totals.forEach((el, i) => {
-    const from = i ? Number(totals[i - 1].dataset.total) : 0;
-    el.textContent = from;
-    setTimeout(() => countUp(el, from, Number(el.dataset.total), 600), parseFloat(el.closest(".col").style.getPropertyValue("--td")) * 1000);
-  });
-}
+document.addEventListener("click", e => { if (pinned && !e.target.closest(".p-btn, .o-chip")) { pinned = null; focusSystem(null); } });
 
 new IntersectionObserver((entries, obs) => {
-  if (entries[0].isIntersecting) { dropBlocks(); obs.disconnect(); }
-}, { threshold: 0.35 }).observe($("#growth-chart"));
+  if (!entries[0].isIntersecting) return;
+  orbitEl.classList.add("go");
+  obs.disconnect();
+}, { threshold: 0.3 }).observe(orbitEl);
+
+if (fine && !reduce) {
+  const stage = $("#orbit-stage");
+  stage.addEventListener("mousemove", e => {
+    const r = stage.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    orbitEl.style.transform = `rotateY(${x * 10}deg) rotateX(${-y * 10}deg)`;
+  });
+  stage.addEventListener("mouseleave", () => { orbitEl.style.transform = ""; });
+}
 
 function splitWords(el) {
   const walk = node => {
@@ -272,8 +284,9 @@ if (hasGsap && !reduce) {
   });
   $$(".eyebrow:not(.hero .eyebrow)").forEach(e => gsap.from(e, { x: -20, opacity: 0, duration: 0.6, scrollTrigger: { trigger: e, start: "top 88%" } }));
 
-  gsap.from(".growth-text > :not(.eyebrow)", { y: 30, opacity: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".growth", start: "top 75%" } });
-  gsap.from(".g-num", { scale: 0, rotate: -30, duration: 0.7, stagger: 0.2, ease: "back.out(2)", scrollTrigger: { trigger: ".growth", start: "top 70%" } });
+  gsap.from(".orbit-copy > :not(.eyebrow)", { y: 30, opacity: 0, duration: 0.8, stagger: 0.12, ease: "power3.out", scrollTrigger: { trigger: ".orbit-sec", start: "top 75%" } });
+  gsap.from(".o-chip", { y: 16, opacity: 0, duration: 0.5, stagger: 0.05, ease: "power3.out", scrollTrigger: { trigger: ".o-groups", start: "top 85%" } });
+  gsap.fromTo(".o-ring", { attr: { "stroke-dasharray": "0 300" } }, { attr: { "stroke-dasharray": "1.2 1.4" }, duration: 1.4, ease: "power2.out", scrollTrigger: { trigger: ".orbit", start: "top 75%" } });
   $$("[data-count]").forEach(el => {
     const end = Number(el.dataset.count);
     const obj = { v: 0 };
