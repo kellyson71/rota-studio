@@ -183,6 +183,46 @@ if (fine && !reduce) {
   });
 }
 
+const SYSTEMS = [
+  ["SEMA", "pub"], ["DEMUTRAN", "pub"], ["Protocolo SEAD", "pub"], ["SECOM", "pub"], ["Estágio PdF", "pub"], ["Integral Clínica", "priv"], ["VFIK", "priv"]
+];
+const R = 96;
+const C = 2 * Math.PI * R;
+const GAP = 7;
+const SEG = C / SYSTEMS.length - GAP;
+$("#arcs").innerHTML = SYSTEMS.map(([name, kind], i) => `<circle class="arc ${kind}" cx="120" cy="120" r="${R}" stroke-dasharray="${SEG} ${C - SEG}" stroke-dashoffset="${-(i * (SEG + GAP) + GAP / 2)}" data-name="${esc(name)}" data-kind="${kind}" tabindex="0" aria-label="${esc(name)}"><title>${esc(name)}</title></circle>`).join("");
+
+$$(".arc").forEach(arc => {
+  arc.dataset.dash = arc.getAttribute("stroke-dasharray");
+  if (hasGsap && !reduce) arc.setAttribute("stroke-dasharray", `0 ${C}`);
+});
+
+function setCenter(num, label) {
+  const center = $(".donut-center");
+  center.classList.remove("swap");
+  void center.offsetWidth;
+  center.classList.add("swap");
+  $("#donut-num").textContent = num;
+  $("#donut-label").textContent = label;
+}
+$$(".arc").forEach(arc => {
+  const on = () => { $("#donut").classList.add("hovering"); arc.classList.add("hot"); setCenter(arc.dataset.kind === "pub" ? "Público" : "Privado", arc.dataset.name); $("#donut-num").style.fontSize = "22px"; };
+  const off = () => { $("#donut").classList.remove("hovering"); arc.classList.remove("hot"); setCenter("7", "sistemas no ar"); $("#donut-num").style.fontSize = ""; };
+  arc.addEventListener("mouseenter", on);
+  arc.addEventListener("mouseleave", off);
+  arc.addEventListener("focus", on);
+  arc.addEventListener("blur", off);
+});
+
+function drawDonut() {
+  $(".impact").classList.add("drawn");
+  if (reduce || !hasGsap) return;
+  $$(".arc").forEach((arc, i) => {
+    gsap.fromTo(arc, { attr: { "stroke-dasharray": `0 ${C}` } }, { attr: { "stroke-dasharray": arc.dataset.dash }, duration: 0.55, delay: i * 0.12, ease: "power2.out" });
+  });
+  gsap.from(".donut-center", { scale: 0.6, opacity: 0, duration: 0.8, ease: "back.out(1.8)" });
+}
+
 function splitWords(el) {
   const walk = node => {
     [...node.childNodes].forEach(n => {
@@ -223,9 +263,9 @@ if (hasGsap && !reduce) {
   });
   $$(".eyebrow:not(.hero .eyebrow)").forEach(e => gsap.from(e, { x: -20, opacity: 0, duration: 0.6, scrollTrigger: { trigger: e, start: "top 88%" } }));
 
-  const stWords = splitWords($(".statement-text"));
-  gsap.fromTo(stWords, { opacity: 0.15 }, { opacity: 1, stagger: 0.05, ease: "none", scrollTrigger: { trigger: ".statement", start: "top 80%", end: "bottom 60%", scrub: true } });
-  $$(".statement .n").forEach((n, i) => ScrollTrigger.create({ trigger: ".statement", start: "top 60%", once: true, onEnter: () => setTimeout(() => n.classList.add("on"), i * 180) }));
+  ScrollTrigger.create({ trigger: ".impact", start: "top 70%", once: true, onEnter: drawDonut });
+  gsap.from(".callout", { y: 30, opacity: 0, duration: 0.8, stagger: 0.15, ease: "power3.out", delay: 0.5, scrollTrigger: { trigger: ".impact", start: "top 70%" } });
+  gsap.from(".impact-text > :not(.eyebrow)", { y: 30, opacity: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".impact", start: "top 75%" } });
   $$("[data-count]").forEach(el => {
     const end = Number(el.dataset.count);
     const obj = { v: 0 };
@@ -268,7 +308,7 @@ if (hasGsap && !reduce) {
 
   window.addEventListener("load", () => ScrollTrigger.refresh());
 } else {
-  $$(".statement .n").forEach(n => n.classList.add("on"));
+  drawDonut();
   $$(".hero .mark").forEach(m => m.classList.add("on"));
   $$(".before").forEach(b => b.style.setProperty("--strike", "100%"));
 }
