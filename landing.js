@@ -512,6 +512,7 @@ document.addEventListener("click", e => {
 
 fetch("metricas.json").then(r => (r.ok ? r.json() : null)).then(data => {
   if (!data || !data.metrics) return;
+  if (data.testimonials || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) loadTestimonials();
   window.METRICS = data.metrics;
   Object.entries(data.metrics).forEach(([id, list]) => {
     const info = document.querySelector(`#toc-${id} .toc-info`);
@@ -521,6 +522,7 @@ fetch("metricas.json").then(r => (r.ok ? r.json() : null)).then(data => {
   if (hasGsap) ScrollTrigger.refresh();
 }).catch(() => {});
 
+function loadTestimonials() {
 fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
   if (!data) return;
   const f = data.featured;
@@ -533,6 +535,7 @@ fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
     ScrollTrigger.refresh();
   }
 }).catch(() => {});
+}
 
 $$(".faq details").forEach(d => d.addEventListener("toggle", () => { if (d.open) $$(".faq details").forEach(o => { if (o !== d) o.open = false; }); }));
 

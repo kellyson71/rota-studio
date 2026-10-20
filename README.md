@@ -1,6 +1,6 @@
 # Rota — Kellyson & Jeyce
 
-Central de freelas da dupla: quem já recebeu mensagem, quem respondeu, quem sumiu e os projetos em andamento. Site estático no GitHub Pages com Supabase como banco.
+Central de freelas da dupla: quem já recebeu mensagem, quem respondeu, quem sumiu e os projetos em andamento. Site estático na Vercel com Supabase como banco.
 
 ## Telas
 
@@ -17,6 +17,10 @@ Central de freelas da dupla: quem já recebeu mensagem, quem respondeu, quem sum
 Para ligar, coloque a chave publicável (Project Settings › API Keys) em `config.js`. Sem a chave, o site roda em modo demonstração, salvando no navegador.
 
 Login por usuário: `kellyson` ou `jeyce` (vira `usuario@rota-studio.app` no Supabase Auth). Para liberar outra pessoa, crie o usuário no Auth e rode `insert into members (email, name) values ('nome@rota-studio.app', 'Nome');`
+
+## Publicação
+
+O site roda na Vercel em https://rota-studio-plum.vercel.app, publicado a cada push na `main`. O endereço antigo do GitHub Pages só redireciona para lá.
 
 ## Rodar local
 

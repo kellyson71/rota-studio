@@ -1,4 +1,4 @@
-name: Publicar GitHub Pages
+name: Redirecionar GitHub Pages para a Vercel
 
 on:
   push:
@@ -21,25 +21,31 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Obter código
-        uses: actions/checkout@v4
-      - name: Validar JavaScript
-        run: |
-          node --check app.js
-          node --check selects.js
-          node --check data.js
-          node --check leads.js
-          node --check store.js
-          node --check seed.js
-          node --check config.js
-          node --check landing.js
-      - name: Preparar site
+      - name: Gerar páginas de redirecionamento
         run: |
           mkdir -p dist
-          cp index.html painel.html privacidade.html termos.html landing.css landing.js style.css config.js store.js seed.js app.js selects.js data.js leads.js plano-original.html .nojekyll dist/
-          cp -R kit dist/kit
-          cp -R assets dist/assets
-          cp metricas.json dist/
+          page() {
+            cat > "dist/$1" <<HTML
+          <!doctype html>
+          <html lang="pt-BR">
+          <head>
+          <meta charset="utf-8">
+          <meta name="robots" content="noindex">
+          <title>Indexa Tecnologia</title>
+          <link rel="canonical" href="https://rota-studio-plum.vercel.app/$2">
+          <meta http-equiv="refresh" content="0; url=https://rota-studio-plum.vercel.app/$2">
+          <script>location.replace("https://rota-studio-plum.vercel.app/$2" + location.search + location.hash);</script>
+          </head>
+          <body><p>Mudamos de endereço: <a href="https://rota-studio-plum.vercel.app/$2">rota-studio-plum.vercel.app</a></p></body>
+          </html>
+          HTML
+          }
+          page index.html ""
+          page painel.html painel
+          page privacidade.html privacidade
+          page termos.html termos
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
       - name: Configurar Pages
         uses: actions/configure-pages@v5
       - name: Enviar arquivos
