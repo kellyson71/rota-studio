@@ -571,3 +571,39 @@ dialog:not([open]) { display: none !important; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; scroll-behavior: auto !important; }
   .bubble { opacity: 1; }
 }
+
+.task-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 4px 0 14px; }
+.ws-progress { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 220px; font-size: 13px; color: var(--ink-2); }
+.ws-progress .meter { flex: 1; max-width: 260px; }
+.ws-progress .meter > div { background: var(--lime); border-right: 1.5px solid var(--ink); }
+.late-count { font-style: normal; font-weight: 700; color: #c4402f; }
+.task-toolbar .seg button { gap: 6px; }
+.task-toolbar .seg .person { width: 18px; height: 18px; font-size: 9px; }
+.drag-hint { margin: 0; }
+.lane-body { min-height: 90px; border-radius: 12px; transition: background .2s; }
+.dragging-task .lane-body { background: rgba(198, 244, 50, .14); outline: 1.5px dashed rgba(22, 21, 15, .25); outline-offset: 2px; }
+.lane-body:empty::before { content: "solte aqui"; display: grid; place-items: center; height: 80px; font-size: 13px; color: var(--muted); }
+.task { cursor: grab; transition: box-shadow .2s, transform .2s; }
+.task:hover { box-shadow: var(--shadow); }
+.task.is-done .task-title { text-decoration: line-through; text-decoration-color: rgba(22, 21, 15, .4); color: var(--ink-2); }
+.task.is-done { background: #fafaf2; }
+.grip { font-size: 12px; letter-spacing: -2px; color: var(--muted); margin-right: 2px; cursor: grab; }
+.task-ghost { opacity: .35; background: var(--lime-2) !important; }
+.task-chosen { box-shadow: var(--shadow-lg); }
+.task-drag { transform: rotate(2.5deg); }
+.due { font-weight: 700; }
+.due.late { color: #c4402f; }
+.due.soon { color: #a8760a; }
+.check-bar { height: 5px; border-radius: 99px; background: var(--bg); overflow: hidden; border: 1px solid var(--line); }
+.check-bar i { display: block; height: 100%; background: var(--g, #1da851); background: #6cbf3a; }
+.quick-task { margin-top: 8px; }
+.quick-task input { width: 100%; border: 1.5px dashed rgba(22, 21, 15, .25); background: transparent; border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+.quick-task input:focus { outline: none; border-style: solid; border-color: var(--ink); background: var(--paper); }
+.lane-3 > header { color: #3b7a1f; }
+.project-card { cursor: grab; }
+@media (max-width: 860px) { .drag-hint { display: none; } }
+@media (hover: hover) and (pointer: fine) {
+  .task .task-controls { display: none; }
+  .task .task-actions { opacity: 0; transition: opacity .2s; }
+  .task:hover .task-actions, .task:focus-within .task-actions { opacity: 1; }
+}

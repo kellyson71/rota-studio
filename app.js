@@ -70,6 +70,7 @@ const ui = {
   limit: 30,
   turbo: { mode: "novos", owner: "meus", category: "Todos", queue: [], index: 0, sent: 0, built: false, anim: "" },
   projectTab: "Em andamento",
+  taskOwner: "Todos",
   openProject: Store.local.read("open-project", null),
   pendingRender: false,
   drawerId: null,
@@ -970,12 +971,12 @@ function demoProject() {
 }
 
 function projectsPage() {
-  const list = Store.projects.filter(p => ui.projectTab === "Todos" || (ui.projectTab === "Entregues" ? p.status === "Entregue" : p.status !== "Entregue"));
+  const list = [...Store.projects].sort((a, b) => (a.order ?? 999) - (b.order ?? 999)).filter(p => ui.projectTab === "Todos" || (ui.projectTab === "Entregues" ? p.status === "Entregue" : p.status !== "Entregue"));
   const open = projectById(ui.openProject);
   return pageHead("da conversa à entrega", "Projetos", "Cada cliente fechado vira um projeto com briefing, tarefas e entrega.", '<button class="btn primary" data-action="new-project" type="button">＋ Novo projeto</button>') + `
   <div class="seg small">${["Em andamento", "Entregues", "Todos"].map(t => `<button class="${ui.projectTab === t ? "on" : ""}" data-action="project-tab" data-tab="${t}" type="button">${t}</button>`).join("")}</div>
   <div class="projects-grid">${list.map((p, i) => { const done = p.tasks.filter(t => t.status === "Feito").length; return `
-    <article class="project-card rise ${open?.id === p.id ? "on" : ""}" style="--i:${i}">
+    <article class="project-card rise ${open?.id === p.id ? "on" : ""}" style="--i:${i}" data-pid="${p.id}">
       <div class="pc-top"><span class="pill tone-${p.status === "Entregue" ? "win" : p.status === "Em revisão" ? "reply" : "wait"}">${esc(p.status)}</span><span>${esc(p.owner || "Dupla")}</span></div>
       <h3>${esc(p.name)}</h3><p>${esc(p.client || "Projeto interno")}</p>
       <div class="meter thin"><div style="width:${p.tasks.length ? (done / p.tasks.length) * 100 : 0}%"></div></div>
@@ -983,6 +984,110 @@ function projectsPage() {
       <button class="btn small" data-action="open-project" data-id="${p.id}" type="button">${open?.id === p.id ? "Aberto ↓" : "Abrir ↗"}</button>
     </article>`; }).join("") || `<div class="empty"><div class="big-emoji">▤</div><h2>${ui.projectTab === "Entregues" ? "As entregas aparecem aqui." : "Nenhum projeto ainda."}</h2><p>Quando um cliente fechar, crie o projeto pela ficha dele.</p><button class="btn" data-action="demo-project" type="button">Ver exemplo com o LabDemo</button></div>`}</div>
   ${open ? projectWorkspace(open) : ""}`;
+}
+
+function dueInfo(t) {
+  if (!t.deadline || t.status === "Feito") return null;
+  const diff = Math.round((new Date(t.deadline + "T12:00:00") - new Date(today() + "T12:00:00")) / 864e5);
+  if (diff < 0) return { cls: "late", label: diff === -1 ? "atrasada 1 dia" : `atrasada ${-diff} dias` };
+  if (diff === 0) return { cls: "soon", label: "vence hoje" };
+  if (diff === 1) return { cls: "soon", label: "vence amanhã" };
+  return { cls: "", label: fmtDay(t.deadline) };
+}
+
+function taskToolbar(p) {
+  const done = p.tasks.filter(t => t.status === "Feito").length;
+  const late = p.tasks.filter(t => dueInfo(t)?.cls === "late").length;
+  const pct = p.tasks.length ? Math.round((done / p.tasks.length) * 100) : 0;
+  return `<div class="task-toolbar">
+    <div class="ws-progress"><div class="meter thin"><div style="width:${pct}%"></div></div><span><b>${done}/${p.tasks.length}</b> feitas · ${pct}%${late ? ` · <em class="late-count">${late} atrasada${late > 1 ? "s" : ""}</em>` : ""}</span></div>
+    <div class="seg small" role="group" aria-label="Filtrar tarefas por responsável">${["Todos", "Kellyson", "Jeyce", "Dupla"].map(o => `<button class="${ui.taskOwner === o ? "on" : ""}" data-action="task-owner" data-owner="${o}" type="button">${o === "Todos" ? "Todos" : personDot(o === "Dupla" ? "" : o) + o}</button>`).join("")}</div>
+    <span class="hint drag-hint">Arraste os cartões entre as colunas</span>
+  </div>`;
+}
+
+function taskCard(p, t) {
+  const due = dueInfo(t);
+  const doneItems = t.checklist?.filter(x => x.done).length || 0;
+  const total = t.checklist?.length || 0;
+  return `<article class="task ${t.status === "Feito" ? "is-done" : ""}" data-task="${t.id}">
+    <div class="task-top"><span class="grip" aria-hidden="true">⋮⋮</span>${personDot(t.owner === "Dupla" ? "" : t.owner)}<span>${esc(t.owner || "Dupla")}</span>${t.priority && t.priority !== "Normal" ? `<span class="prio p-${esc(t.priority.toLowerCase())}">${esc(t.priority)}</span>` : ""}</div>
+    <button class="task-title" data-action="edit-task" data-project="${p.id}" data-id="${t.id}" type="button">${esc(t.name)}</button>
+    ${t.description ? `<p class="task-desc">${esc(t.description)}</p>` : ""}
+    <div class="task-facts">${due ? `<span class="due ${due.cls}">◷ ${esc(due.label)}</span>` : ""}${t.recipient ? `<span>↗ ${esc(t.recipient)}</span>` : ""}${t.delivery ? `<span>▤ ${esc(t.delivery)}</span>` : ""}</div>
+    ${total ? `<div class="check-bar" title="${doneItems} de ${total} critérios"><i style="width:${(doneItems / total) * 100}%"></i></div><details class="checklist"><summary>✓ ${doneItems}/${total} critérios</summary>${t.checklist.map((x, i) => `<label><input type="checkbox" data-field="criterion" data-project="${p.id}" data-id="${t.id}" data-index="${i}" ${x.done ? "checked" : ""}><span>${esc(x.text)}</span></label>`).join("")}</details>` : ""}
+    <div class="task-controls"><select data-field="task-status" data-project="${p.id}" data-id="${t.id}" aria-label="Andamento de ${esc(t.name)}">${opts(TASK_STATES, t.status)}</select></div>
+    <div class="task-actions"><button class="link" data-action="edit-task" data-project="${p.id}" data-id="${t.id}" type="button">detalhar</button><button class="link" data-action="copy-task" data-project="${p.id}" data-id="${t.id}" type="button">⧉ copiar</button></div>
+  </article>`;
+}
+
+function taskLane(p, st) {
+  const visible = p.tasks.filter(t => t.status === st && (ui.taskOwner === "Todos" || (t.owner || "Dupla") === ui.taskOwner));
+  return `<section class="lane lane-${TASK_STATES.indexOf(st)}"><header>${st}<small>${p.tasks.filter(t => t.status === st).length}</small></header><div class="lane-body" data-status="${st}" data-project="${p.id}">${visible.map(t => taskCard(p, t)).join("")}</div><form class="quick-task" data-project="${p.id}" data-status="${st}"><input name="name" placeholder="＋ Adicionar tarefa" aria-label="Nova tarefa em ${st}" autocomplete="off" maxlength="140"></form></section>`;
+}
+
+function syncBoard(p) {
+  const pool = new Map(p.tasks.map(t => [t.id, t]));
+  const next = [];
+  let finished = 0;
+  $$(".lane-body[data-status]").forEach(body => {
+    $$(".task[data-task]", body).forEach(el => {
+      const t = pool.get(el.dataset.task);
+      if (!t) return;
+      if (t.status !== body.dataset.status) {
+        if (body.dataset.status === "Feito") finished++;
+        t.status = body.dataset.status;
+        t.updatedAt = now();
+      }
+      next.push(t);
+      pool.delete(t.id);
+    });
+  });
+  p.tasks = [...next, ...pool.values()];
+  p.updatedAt = now();
+  Store.saveProject(p, { silent: true });
+  render();
+  if (finished) toast(pick(["Tarefa feita. Próxima!", "Riscou da lista.", "Feito. Bom trabalho."]));
+}
+
+function initBoards() {
+  if (!window.Sortable) return;
+  const p = projectById(ui.openProject);
+  if (!p) return;
+  $$(".lane-body[data-status]").forEach(body => {
+    Sortable.create(body, {
+      group: "tasks-" + p.id,
+      animation: 180,
+      easing: "cubic-bezier(.2, .8, .2, 1)",
+      ghostClass: "task-ghost",
+      chosenClass: "task-chosen",
+      dragClass: "task-drag",
+      delay: 160,
+      delayOnTouchOnly: true,
+      forceFallback: true,
+      fallbackTolerance: 4,
+      filter: "button, input, select, textarea, summary, label, a, .select-wrap",
+      preventOnFilter: false,
+      onStart: () => document.body.classList.add("dragging-task"),
+      onEnd: () => { document.body.classList.remove("dragging-task"); syncBoard(p); }
+    });
+  });
+  const grid = $(".projects-grid");
+  if (grid && !grid.dataset.sortable) {
+    grid.dataset.sortable = "1";
+    Sortable.create(grid, {
+      animation: 180,
+      draggable: ".project-card",
+      filter: "button, a",
+      preventOnFilter: false,
+      forceFallback: true,
+      fallbackTolerance: 4,
+      ghostClass: "task-ghost",
+      onEnd: () => {
+        $$(".project-card[data-pid]", grid).forEach((el, i) => { const pr = projectById(el.dataset.pid); if (pr && pr.order !== i) { pr.order = i; Store.saveProject(pr, { silent: true }); } });
+      }
+    });
+  }
 }
 
 function projectWorkspace(p) {
@@ -996,16 +1101,8 @@ function projectWorkspace(p) {
       <div class="field"><label for="ws-notes">Notas compartilhadas</label><textarea id="ws-notes" data-field="project-notes" data-id="${p.id}">${esc(p.notes || "")}</textarea></div>
       <div class="field"><label for="ws-scope">Escopo e aprovação</label><textarea id="ws-scope" data-field="project-scope" data-id="${p.id}">${esc(p.scope || "")}</textarea></div>
     </div></details>
-    <div class="board-wrap"><div class="tasks-board">${TASK_STATES.map(s => `<section class="lane"><header>${s}<small>${p.tasks.filter(t => t.status === s).length}</small></header><div class="lane-body">${p.tasks.filter(t => t.status === s).map(t => `
-      <article class="task">
-        <div class="task-top">${personDot(t.owner === "Dupla" ? "" : t.owner)}<span>${esc(t.owner || "Dupla")}</span>${t.priority && t.priority !== "Normal" ? `<span class="prio p-${esc(t.priority.toLowerCase())}">${esc(t.priority)}</span>` : ""}</div>
-        <button class="task-title" data-action="edit-task" data-project="${p.id}" data-id="${t.id}" type="button">${esc(t.name)}</button>
-        ${t.description ? `<p class="task-desc">${esc(t.description)}</p>` : ""}
-        <div class="task-facts">${t.recipient ? `<span>↗ ${esc(t.recipient)}</span>` : ""}${t.deadline ? `<span>◷ ${esc(fullDate(t.deadline))}</span>` : ""}${t.delivery ? `<span>▤ ${esc(t.delivery)}</span>` : ""}</div>
-        ${t.checklist?.length ? `<details class="checklist"><summary>✓ ${t.checklist.filter(x => x.done).length}/${t.checklist.length} critérios</summary>${t.checklist.map((x, i) => `<label><input type="checkbox" data-field="criterion" data-project="${p.id}" data-id="${t.id}" data-index="${i}" ${x.done ? "checked" : ""}><span>${esc(x.text)}</span></label>`).join("")}</details>` : ""}
-        <div class="task-controls"><select data-field="task-status" data-project="${p.id}" data-id="${t.id}" aria-label="Andamento de ${esc(t.name)}">${opts(TASK_STATES, t.status)}</select></div>
-        <div class="task-actions"><button class="link" data-action="edit-task" data-project="${p.id}" data-id="${t.id}" type="button">detalhar</button><button class="link" data-action="copy-task" data-project="${p.id}" data-id="${t.id}" type="button">⧉ copiar</button></div>
-      </article>`).join("") || '<p class="lane-empty">nada aqui</p>'}</div></section>`).join("")}</div></div>
+    ${taskToolbar(p)}
+    <div class="board-wrap"><div class="tasks-board">${TASK_STATES.map(st => taskLane(p, st)).join("")}</div></div>
   </section>`;
 }
 
@@ -1060,6 +1157,7 @@ function render() {
   const pages = { inicio: homePage, turbo: turboPage, contatos: contactsPage, prefeituras: contactsPage, projetos: projectsPage, materiais: libraryPage };
   $("#app").innerHTML = (pages[r] || homePage)();
   bindPage();
+  if (r === "projetos") initBoards();
 }
 
 function bindPage() {
@@ -1147,6 +1245,7 @@ const actions = {
   "new-project": el => projectForm(el.dataset.id ? byId(el.dataset.id) : null),
   "demo-project": () => demoProject(),
   "project-tab": el => { ui.projectTab = el.dataset.tab; render(); },
+  "task-owner": el => { ui.taskOwner = el.dataset.owner; render(); },
   "open-project": el => {
     ui.openProject = el.dataset.id;
     Store.local.write("open-project", ui.openProject);
@@ -1215,6 +1314,22 @@ document.addEventListener("change", e => {
     const list = p.tasks.find(x => x.id === el.dataset.id).checklist;
     sum.textContent = `✓ ${list.filter(x => x.done).length}/${list.length} critérios`;
   }
+});
+
+document.addEventListener("submit", e => {
+  const form = e.target.closest(".quick-task");
+  if (!form) return;
+  e.preventDefault();
+  const name = form.elements.name.value.trim();
+  if (!name) return;
+  const p = projectById(form.dataset.project);
+  const owner = ui.taskOwner !== "Todos" ? ui.taskOwner : actor();
+  p.tasks.push({ id: "t-" + uid(), name, owner, status: form.dataset.status, priority: "Normal", checklist: [], createdAt: now() });
+  Store.saveProject(p, { silent: true });
+  ui.pendingRender = false;
+  render();
+  const f = $(`.quick-task[data-status="${form.dataset.status}"] input`);
+  if (f) f.focus();
 });
 
 document.addEventListener("input", e => {
