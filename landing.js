@@ -523,18 +523,18 @@ fetch("metricas.json").then(r => (r.ok ? r.json() : null)).then(data => {
 }).catch(() => {});
 
 function loadTestimonials() {
-fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
-  if (!data) return;
-  const f = data.featured;
-  const who = (x, c) => `<div class="v-who"><img src="assets/logos/${x.logo}.webp" alt="" width="46" height="46" loading="lazy"><div><strong>${esc(x.name)}</strong><span>${esc(x.role)}${x.date ? ` · ${esc(x.date)}` : ""}</span></div></div>`;
-  $("#voices").innerHTML = `<article class="v-featured"><div><blockquote>${esc(f.quote)}</blockquote>${who(f)}</div><div class="v-stat"><strong>${esc(f.stat)}</strong><span>${esc(f.statLabel)}</span></div></article>` +
-    data.items.map(x => `<article class="v-card" style="--c:var(--${x.color})"><div><span class="mark ${x.color}" aria-hidden="true">“</span><blockquote>${esc(x.quote)}</blockquote></div>${who(x)}</article>`).join("");
-  $("#depoimentos").hidden = false;
-  if (hasGsap && !reduce) {
-    gsap.from(".v-featured, .v-card", { y: 60, opacity: 0, duration: 0.9, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: "#voices", start: "top 85%" } });
-    ScrollTrigger.refresh();
-  }
-}).catch(() => {});
+  fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
+    if (!data) return;
+    const f = data.featured;
+    const who = (x, c) => `<div class="v-who"><img src="assets/logos/${x.logo}.webp" alt="" width="46" height="46" loading="lazy"><div><strong>${esc(x.name)}</strong><span>${esc(x.role)}${x.date ? ` · ${esc(x.date)}` : ""}</span></div></div>`;
+    $("#voices").innerHTML = `<article class="v-featured"><div><blockquote>${esc(f.quote)}</blockquote>${who(f)}</div><div class="v-stat"><strong>${esc(f.stat)}</strong><span>${esc(f.statLabel)}</span></div></article>` +
+      data.items.map(x => `<article class="v-card" style="--c:var(--${x.color})"><div><span class="mark ${x.color}" aria-hidden="true">“</span><blockquote>${esc(x.quote)}</blockquote></div>${who(x)}</article>`).join("");
+    $("#depoimentos").hidden = false;
+    if (hasGsap && !reduce) {
+      gsap.from(".v-featured, .v-card", { y: 60, opacity: 0, duration: 0.9, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: "#voices", start: "top 85%" } });
+      ScrollTrigger.refresh();
+    }
+  }).catch(() => {});
 }
 
 $$(".faq details").forEach(d => d.addEventListener("toggle", () => { if (d.open) $$(".faq details").forEach(o => { if (o !== d) o.open = false; }); }));
