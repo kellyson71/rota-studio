@@ -384,7 +384,7 @@ if (hasGsap && !reduce) {
   $$(".eyebrow:not(.hero .eyebrow)").forEach(e => gsap.from(e, { x: -20, opacity: 0, duration: 0.6, scrollTrigger: { trigger: e, start: "top 88%" } }));
 
   gsap.from(".orbit-copy > :not(.eyebrow)", { y: 30, opacity: 0, duration: 0.8, stagger: 0.12, ease: "power3.out", scrollTrigger: { trigger: ".orbit-sec", start: "top 75%" } });
-  gsap.from(".o-chip", { y: 16, opacity: 0, duration: 0.5, stagger: 0.05, ease: "power3.out", scrollTrigger: { trigger: ".o-groups", start: "top 85%" } });
+  gsap.from(".o-chip", { y: 16, opacity: 0, duration: 0.5, stagger: 0.05, ease: "power3.out", clearProps: "transform,opacity", scrollTrigger: { trigger: ".o-groups", start: "top 85%" } });
   gsap.fromTo(".o-ring", { attr: { "stroke-dasharray": "0 300" } }, { attr: { "stroke-dasharray": "1.2 1.4" }, duration: 1.4, ease: "power2.out", scrollTrigger: { trigger: ".orbit", start: "top 75%" } });
   $$("[data-count]").forEach(el => {
     const end = Number(el.dataset.count);
