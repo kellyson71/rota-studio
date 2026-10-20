@@ -37,7 +37,7 @@ body {
   background-size: 22px 22px;
   color: var(--ink);
   font: 15px/1.5 var(--body);
-  min-height: 100dvh;
+  min-height: 100vh;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -345,7 +345,7 @@ dialog { border: var(--border); background: var(--paper); color: var(--ink); pad
 dialog::backdrop { background: rgba(22, 21, 15, .35); backdrop-filter: blur(3px); }
 .close { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border: var(--border); border-radius: 50%; background: var(--paper); font-size: 20px; line-height: 1; z-index: 2; transition: transform .2s var(--ease); }
 .close:hover { transform: rotate(90deg); background: var(--pink-2); }
-.drawer { position: fixed; margin: 0 0 0 auto; inset: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(580px, 100%); max-width: 100%; border-width: 0 0 0 1.5px; overflow-y: auto; overscroll-behavior: contain; }
+.drawer { position: fixed; margin: 0 0 0 auto; inset: 0 0 0 auto; height: 100vh; max-height: 100vh; width: min(580px, 100%); max-width: 100%; border-width: 0 0 0 1.5px; overflow-y: auto; overscroll-behavior: contain; }
 .drawer[open] { animation: slideIn .28s var(--ease); }
 #drawer-content { padding: 26px 26px 40px; }
 .d-head { display: flex; gap: 14px; align-items: flex-start; padding-right: 40px; }
@@ -379,7 +379,9 @@ dialog::backdrop { background: rgba(22, 21, 15, .35); backdrop-filter: blur(3px)
 details summary { cursor: pointer; font-weight: 700; }
 details p { font-size: 14px; color: var(--ink-2); }
 
-.modal { width: min(680px, calc(100% - 24px)); max-height: 90dvh; border-radius: 22px; box-shadow: var(--shadow-lg); overflow-y: auto; }
+.modal { width: min(680px, calc(100% - 24px)); max-height: calc(100vh - 48px); border-radius: 22px; box-shadow: var(--shadow-lg); overflow-y: auto; }
+dialog:not([open]) { display: none !important; }
+.modal[open] { display: block; height: auto; min-height: 120px; }
 .modal[open] { animation: pop .3s var(--ease); }
 #modal-content { padding: 28px; }
 #modal-content h2 { font: 800 28px/1.1 var(--display); letter-spacing: -1px; margin: 6px 0 16px; padding-right: 40px; }
