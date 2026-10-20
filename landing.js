@@ -243,8 +243,8 @@ new IntersectionObserver((entries, obs) => {
   const path = $("path", tether);
   const core = $(".core", stage);
   const btns = $$(".p-btn");
-  const state = new Map(btns.map(b => [b, { x: 0, y: 0, s: 0, px: 0, py: 0 }]));
-  const RANGE = 130;
+  const state = new Map(btns.map(b => [b, { x: 0, y: 0, vx: 0, vy: 0, ix: 0, iy: 0, ivx: 0, ivy: 0, img: b.querySelector("img") }]));
+  const RANGE = 150;
   const GRAB = 64;
   const ctrl = { x: 0, y: 0, vx: 0, vy: 0, init: false };
   let mouse = null;
@@ -269,27 +269,34 @@ new IntersectionObserver((entries, obs) => {
     });
     btns.forEach(b => {
       const st = state.get(b);
-      let tx = 0, ty = 0, ts = 0;
-      if (b === nearest && !reduce) {
+      const active = b === nearest && !reduce;
+      let tx = 0, ty = 0, itx = 0, ity = 0;
+      if (active) {
         const base = bases.get(b);
-        const dx = mouse.x - base.x, dy = mouse.y - base.y;
-        const k = Math.pow(1 - best / RANGE, 1.4);
-        tx = dx * (0.3 + 0.62 * k);
-        ty = dy * (0.3 + 0.62 * k);
-        ts = k;
+        const mx = mouse.x - base.x, my = mouse.y - base.y;
+        const k = 1 - best / RANGE;
+        tx = mx * 0.38 * k;
+        ty = my * 0.38 * k;
+        itx = mx * 0.16 * k;
+        ity = my * 0.16 * k;
       }
-      const ox = st.x, oy = st.y;
-      st.x += (tx - st.x) * 0.15;
-      st.y += (ty - st.y) * 0.15;
-      st.s += (ts - st.s) * 0.15;
-      const vx = st.x - ox, vy = st.y - oy;
-      const disp = Math.hypot(st.x, st.y);
-      const vel = Math.hypot(vx, vy);
-      const stretch = Math.min(0.32, disp * 0.0022 + vel * 0.035);
-      const ang = Math.atan2(vel > 0.4 ? vy : st.y, vel > 0.4 ? vx : st.x) * 180 / Math.PI;
-      const grow = 1 + st.s * 0.2;
-      if (disp < 0.05 && st.s < 0.002) { b.style.transform = ""; return; }
-      b.style.transform = `translate(${st.x.toFixed(2)}px, ${st.y.toFixed(2)}px) rotate(${ang.toFixed(1)}deg) scale(${(grow + stretch).toFixed(3)}, ${(grow - stretch * 0.55).toFixed(3)}) rotate(${(-ang).toFixed(1)}deg)`;
+      const stiff = active ? 0.16 : 0.06;
+      const damp = active ? 0.72 : 0.86;
+      st.vx = (st.vx + (tx - st.x) * stiff) * damp;
+      st.vy = (st.vy + (ty - st.y) * stiff) * damp;
+      st.x += st.vx;
+      st.y += st.vy;
+      st.ivx = (st.ivx + (itx - st.ix) * (active ? 0.2 : 0.12)) * (active ? 0.7 : 0.78);
+      st.ivy = (st.ivy + (ity - st.iy) * (active ? 0.2 : 0.12)) * (active ? 0.7 : 0.78);
+      st.ix += st.ivx;
+      st.iy += st.ivy;
+      if (!active && Math.abs(st.x) + Math.abs(st.y) + Math.abs(st.vx) + Math.abs(st.vy) + Math.abs(st.ix) + Math.abs(st.iy) < 0.03) {
+        if (b.style.transform) { b.style.transform = ""; st.img.style.transform = ""; }
+        st.x = st.y = st.vx = st.vy = st.ix = st.iy = st.ivx = st.ivy = 0;
+        return;
+      }
+      b.style.transform = `translate(${st.x.toFixed(2)}px, ${st.y.toFixed(2)}px)`;
+      st.img.style.transform = `translate(${st.ix.toFixed(2)}px, ${st.iy.toFixed(2)}px)`;
     });
     if (fine) {
       const id = nearest && best < GRAB ? nearest.dataset.id : null;
@@ -307,10 +314,10 @@ new IntersectionObserver((entries, obs) => {
       const len = Math.hypot(z.x - a.x, z.y - a.y) || 1;
       const nx = -(z.y - a.y) / len, ny = (z.x - a.x) / len;
       const sway = (st.x * nx + st.y * ny);
-      const goal = { x: mid.x - nx * sway * 1.8 + nx * 14, y: mid.y - ny * sway * 1.8 + ny * 14 };
+      const goal = { x: mid.x - nx * sway * 0.35, y: mid.y - ny * sway * 0.35 };
       if (!ctrl.init) { ctrl.x = goal.x; ctrl.y = goal.y; ctrl.init = true; }
-      ctrl.vx = (ctrl.vx + (goal.x - ctrl.x) * 0.07) * 0.86;
-      ctrl.vy = (ctrl.vy + (goal.y - ctrl.y) * 0.07) * 0.86;
+      ctrl.vx = (ctrl.vx + (goal.x - ctrl.x) * 0.14) * 0.74;
+      ctrl.vy = (ctrl.vy + (goal.y - ctrl.y) * 0.14) * 0.74;
       ctrl.x += ctrl.vx;
       ctrl.y += ctrl.vy;
       path.setAttribute("d", `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${z.x.toFixed(1)} ${z.y.toFixed(1)}`);
@@ -387,7 +394,7 @@ if (hasGsap && !reduce) {
   const mm = gsap.matchMedia();
   mm.add("(min-width: 900px)", () => {
     const items = $$(".pain-list li");
-    const tl = gsap.timeline({ scrollTrigger: { trigger: ".pains", start: () => "top " + $(".nav").offsetHeight, end: () => "+=" + items.length * 380, scrub: 0.6, pin: true, anticipatePin: 1, invalidateOnRefresh: true } });
+    const tl = gsap.timeline({ scrollTrigger: { trigger: ".pains", start: () => "top " + $(".nav").offsetHeight, end: () => "+=" + items.length * 380, scrub: 0.6, pin: true, invalidateOnRefresh: true } });
     items.forEach((li, i) => {
       tl.to(li, { opacity: 1, duration: 0.2 }, i)
         .to($(".before", li), { "--strike": "100%", color: "rgba(19,18,16,.35)", duration: 0.5 }, i + 0.1)
@@ -444,6 +451,18 @@ const contactTop = () => $("#contato").getBoundingClientRect().top;
 const syncFloat = () => waFloat.classList.toggle("on", heroEnd() < 0 && contactTop() > innerHeight * 0.6);
 addEventListener("scroll", syncFloat, { passive: true });
 syncFloat();
+
+document.addEventListener("click", e => {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a || a.hasAttribute("data-wa")) return;
+  const id = a.getAttribute("href").slice(1);
+  const target = id ? document.getElementById(id) : document.body;
+  if (!target) return;
+  e.preventDefault();
+  const top = id ? target.getBoundingClientRect().top + scrollY - ($(".nav").offsetHeight + 8) : 0;
+  window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+  history.replaceState(null, "", id ? "#" + id : location.pathname);
+});
 
 $$(".faq details").forEach(d => d.addEventListener("toggle", () => { if (d.open) $$(".faq details").forEach(o => { if (o !== d) o.open = false; }); }));
 
