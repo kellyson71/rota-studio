@@ -341,13 +341,14 @@ textarea:focus { background: var(--paper); box-shadow: var(--shadow); outline: n
 .card-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 8px; }
 .more-lane { display: block; margin: 6px auto; }
 
-dialog { border: var(--border); background: var(--paper); color: var(--ink); padding: 0; }
-dialog::backdrop { background: rgba(22, 21, 15, .35); backdrop-filter: blur(3px); }
+dialog { border: var(--border); background: #fffdf7; background-color: #fffdf7; color: var(--ink); padding: 0; isolation: isolate; }
+dialog::backdrop { background: rgba(22, 21, 15, .5); }
 .close { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border: var(--border); border-radius: 50%; background: var(--paper); font-size: 20px; line-height: 1; z-index: 2; transition: transform .2s var(--ease); }
 .close:hover { transform: rotate(90deg); background: var(--pink-2); }
 .drawer { position: fixed; margin: 0 0 0 auto; inset: 0 0 0 auto; height: 100vh; max-height: 100vh; width: min(580px, 100%); max-width: 100%; border-width: 0 0 0 1.5px; overflow-y: auto; overscroll-behavior: contain; }
-.drawer[open] { animation: slideIn .28s var(--ease); }
-#drawer-content { padding: 26px 26px 40px; }
+.drawer[open] { animation: drawerIn .28s ease-out; }
+@keyframes drawerIn { from { translate: 40px 0; } }
+#drawer-content { padding: 26px 26px 40px; background: #fffdf7; min-height: 100%; }
 .d-head { display: flex; gap: 14px; align-items: flex-start; padding-right: 40px; }
 .d-head > div { flex: 1; min-width: 0; }
 .d-head h2 { font: 800 26px/1.1 var(--display); letter-spacing: -.8px; margin: 4px 0 8px; }
@@ -382,8 +383,9 @@ details p { font-size: 14px; color: var(--ink-2); }
 .modal { width: min(680px, calc(100% - 24px)); max-height: calc(100vh - 48px); border-radius: 22px; box-shadow: var(--shadow-lg); overflow-y: auto; }
 dialog:not([open]) { display: none !important; }
 .modal[open] { display: block; height: fit-content; min-height: 120px; }
-.modal[open] { animation: pop .3s var(--ease); }
-#modal-content { padding: 28px; }
+.modal[open] { animation: dialogIn .25s ease-out; }
+@keyframes dialogIn { from { translate: 0 10px; } }
+#modal-content { padding: 28px; background: #fffdf7; min-height: 100%; }
 #modal-content h2 { font: 800 28px/1.1 var(--display); letter-spacing: -1px; margin: 6px 0 16px; padding-right: 40px; }
 .form { display: grid; gap: 14px; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
