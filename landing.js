@@ -2,18 +2,15 @@ function fitLogos() {
   document.querySelectorAll(".logo > span").forEach(box => {
     const small = box.querySelector("small");
     if (!small) return;
-    const word = box.firstChild;
     const range = document.createRange();
-    range.selectNodeContents(word);
+    range.selectNodeContents(box.firstChild);
     const target = range.getBoundingClientRect().width;
-    small.style.letterSpacing = "0px";
-    small.style.marginRight = "0px";
-    const natural = small.getBoundingClientRect().width;
-    const gaps = small.textContent.length - 1;
-    if (!target || !natural || gaps < 1) return;
-    const ls = (target - natural) / gaps;
-    small.style.letterSpacing = ls + "px";
-    small.style.marginRight = -ls + "px";
+    small.style.fontSize = "10px";
+    const natural = small.getBoundingClientRect().width - parseFloat(getComputedStyle(small).letterSpacing);
+    if (!target || !natural) return;
+    const size = 10 * target / natural;
+    small.style.fontSize = size + "px";
+    small.style.marginRight = -parseFloat(getComputedStyle(small).letterSpacing) + "px";
   });
 }
 (document.fonts ? document.fonts.ready : Promise.resolve()).then(fitLogos);

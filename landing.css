@@ -31,7 +31,7 @@ section { scroll-margin-top: 70px; }
 .nav { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 28px; padding: 14px var(--pad); background: rgba(246, 243, 236, .82); backdrop-filter: blur(14px) saturate(1.4); border-bottom: 1px solid var(--line); }
 .logo { display: inline-flex; align-items: center; gap: 10px; font: 800 25px/1 var(--display); letter-spacing: -1px; }
 .logo > span { display: inline-flex; flex-direction: column; }
-.logo small { display: block; font: 600 8px/1 var(--body); text-transform: uppercase; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.logo small { display: block; font: 500 8px/1 var(--body); letter-spacing: .32em; text-transform: uppercase; color: var(--muted); margin-top: 2px; white-space: nowrap; }
 .logo img { transition: transform .5s cubic-bezier(.3, 1.6, .5, 1); }
 .logo:hover img { transform: rotate(-14deg) scale(1.1); }
 .nav nav { display: flex; gap: 30px; margin-left: auto; font-weight: 500; font-size: 15px; }
