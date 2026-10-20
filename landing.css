@@ -159,12 +159,12 @@ li.teasing .toc-more, .toc-row:hover .toc-more, .toc-row:focus-visible .toc-more
 .orbit.go .planet { --rr: var(--r); }
 .p-face { position: absolute; left: 0; top: 0; animation: orbit-spin var(--dur) linear infinite reverse; }
 .spin-out .p-face { animation-direction: normal; }
-.p-btn { position: absolute; left: 0; top: 0; translate: -50% -50%; width: 12cqw; height: 12cqw; min-width: 44px; min-height: 44px; border-radius: 50%; background: #fff; border: 3px solid var(--b); display: grid; place-items: center; padding: 0; cursor: pointer; transition: scale .4s cubic-bezier(.3, 1.6, .5, 1), opacity .3s, box-shadow .3s; }
+.p-btn { position: absolute; left: 0; top: 0; translate: -50% -50%; width: 12cqw; height: 12cqw; min-width: 44px; min-height: 44px; border-radius: 50%; background: #fff; border: 3px solid var(--b); display: grid; place-items: center; padding: 0; cursor: pointer; transition: scale .4s cubic-bezier(.3, 1.6, .5, 1), opacity .3s, box-shadow .3s; will-change: transform; }
 .p-btn img { width: 66%; height: 66%; object-fit: contain; pointer-events: none; }
 .planet.priv .p-btn { width: 15cqw; height: 15cqw; border-color: var(--g); }
 .p-btn small { position: absolute; top: calc(100% + 6px); left: 50%; translate: -50% 0; font-size: 12px; font-weight: 700; white-space: nowrap; color: var(--ink-2); transition: opacity .3s; }
 .orbit.focus .planet:not(.on) .p-btn { opacity: .35; scale: .9; }
-.planet.on .p-btn { scale: 1.18; box-shadow: 0 0 0 8px rgba(52, 120, 246, .16); }
+.planet.on .p-btn { box-shadow: 0 0 0 8px rgba(52, 120, 246, .16); }
 .planet.priv.on .p-btn { box-shadow: 0 0 0 8px rgba(29, 168, 81, .18); }
 .planet.on { z-index: 4; }
 .beam { position: absolute; left: 0; top: -1px; height: 2px; width: var(--r); transform-origin: 0 50%; transform: rotate(var(--a)) scaleX(0); transition: transform .45s cubic-bezier(.6, 0, .2, 1); background: linear-gradient(90deg, transparent 14%, var(--c) 40%); border-radius: 2px; z-index: 1; }

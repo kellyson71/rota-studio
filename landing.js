@@ -218,9 +218,11 @@ function focusSystem(id) {
   if (x) card.innerHTML = `<strong>${esc(x.name)}<em class="${x.kind}">${x.kind === "pub" ? "público" : "privado"}</em></strong><span>${esc(x.client)}</span><span class="since">No ar desde ${x.year}</span>`;
   card.classList.toggle("on", Boolean(x));
 }
-$$("[data-id].p-btn, .o-chip").forEach(el => {
+$$(".o-chip").forEach(el => {
   el.addEventListener("mouseenter", () => { if (fine) focusSystem(el.dataset.id); });
-  el.addEventListener("mouseleave", () => { if (fine && !pinned) focusSystem(null); else if (fine && pinned) focusSystem(pinned); });
+  el.addEventListener("mouseleave", () => { if (fine) focusSystem(pinned); });
+});
+$$("[data-id].p-btn, .o-chip").forEach(el => {
   el.addEventListener("focus", () => focusSystem(el.dataset.id));
   el.addEventListener("blur", () => { if (!pinned) focusSystem(null); });
   el.addEventListener("click", () => { pinned = pinned === el.dataset.id ? null : el.dataset.id; focusSystem(pinned); });
@@ -232,6 +234,47 @@ new IntersectionObserver((entries, obs) => {
   orbitEl.classList.add("go");
   obs.disconnect();
 }, { threshold: 0.3 }).observe(orbitEl);
+
+if (fine) {
+  const stage = $("#orbit-stage");
+  const btns = $$(".p-btn");
+  const state = new Map(btns.map(b => [b, { x: 0, y: 0, s: 0 }]));
+  const RANGE = 130;
+  const GRAB = 64;
+  let mouse = null;
+  let current = null;
+  stage.addEventListener("mousemove", e => { mouse = { x: e.clientX, y: e.clientY }; });
+  stage.addEventListener("mouseleave", () => { mouse = null; });
+  (function magnet() {
+    let nearest = null;
+    let best = Infinity;
+    btns.forEach(b => {
+      const st = state.get(b);
+      const r = b.getBoundingClientRect();
+      const cx = r.left + r.width / 2 - st.x;
+      const cy = r.top + r.height / 2 - st.y;
+      let tx = 0, ty = 0, ts = 0;
+      if (mouse) {
+        const dx = mouse.x - cx, dy = mouse.y - cy;
+        const d = Math.hypot(dx, dy);
+        if (d < RANGE) {
+          const k = Math.pow(1 - d / RANGE, 1.6);
+          tx = dx * (0.25 + 0.65 * k);
+          ty = dy * (0.25 + 0.65 * k);
+          ts = k;
+          if (d < best) { best = d; nearest = b; }
+        }
+      }
+      st.x += (tx - st.x) * 0.16;
+      st.y += (ty - st.y) * 0.16;
+      st.s += (ts - st.s) * 0.16;
+      b.style.transform = `translate(${st.x.toFixed(2)}px, ${st.y.toFixed(2)}px) scale(${(1 + st.s * 0.22).toFixed(3)})`;
+    });
+    const id = nearest && best < GRAB ? nearest.dataset.id : null;
+    if (id !== current && !pinned) { current = id; focusSystem(id); stage.style.cursor = id ? "pointer" : ""; }
+    requestAnimationFrame(magnet);
+  })();
+}
 
 if (fine && !reduce) {
   const stage = $("#orbit-stage");
