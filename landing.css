@@ -219,6 +219,13 @@ li.teasing .toc-more, .toc-row:hover .toc-more, .toc-row:focus-visible .toc-more
 .o-card.on { opacity: 1; transform: none; }
 .o-card strong { display: block; font: 800 17px var(--display); }
 .o-card span { display: block; font-size: 13px; color: rgba(255, 255, 255, .7); }
+.o-card .metric { display: block; margin: 6px 0 2px; font: 800 26px/1 var(--display); color: var(--y); }
+.o-card .metric small { font: 500 13px var(--body); color: rgba(255, 255, 255, .75); }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 6px; }
+.metrics div { background: #fff; border-radius: 16px; padding: 12px 14px; }
+.metrics strong { display: block; font: 800 clamp(24px, 2.4vw, 32px)/1 var(--display); letter-spacing: -1px; color: var(--ink); }
+.metrics span { display: block; margin-top: 4px; font-size: 13px; line-height: 1.3; color: var(--muted); }
+.as-of { font-size: 12px !important; color: var(--muted) !important; margin: 0 0 14px !important; }
 .o-card .since { margin-top: 2px; color: #fff; font-weight: 700; }
 .o-card em { font-style: normal; display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; }
 .o-card em.pub { background: var(--b); }

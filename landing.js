@@ -216,7 +216,8 @@ function focusSystem(id) {
   orbitEl.classList.toggle("focus", Boolean(x));
   $$(".planet, .o-chip").forEach(el => el.classList.toggle("on", Boolean(x) && el.dataset.id === id));
   const card = $("#o-card");
-  if (x) card.innerHTML = `<strong>${esc(x.name)}<em class="${x.kind}">${x.kind === "pub" ? "público" : "privado"}</em></strong><span>${esc(x.client)}</span><span class="since">No ar desde ${x.year}</span>`;
+  const m = x && window.METRICS && window.METRICS[x.id] ? window.METRICS[x.id][0] : null;
+  if (x) card.innerHTML = `<strong>${esc(x.name)}<em class="${x.kind}">${x.kind === "pub" ? "público" : "privado"}</em></strong><span>${esc(x.client)}</span>${m ? `<b class="metric">${esc(m[0])} <small>${esc(m[1])}</small></b>` : ""}<span class="since">No ar desde ${x.year}</span>`;
   card.classList.toggle("on", Boolean(x));
 }
 $$(".o-chip").forEach(el => {
@@ -512,10 +513,18 @@ document.addEventListener("click", e => {
 fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
   if (!data) return;
   const f = data.featured;
-  const who = (x, c) => `<div class="v-who"><img src="assets/logos/${x.logo}.webp" alt="" width="46" height="46" loading="lazy"><div><strong>${esc(x.name)}</strong><span>${esc(x.role)}</span></div></div>`;
+  const who = (x, c) => `<div class="v-who"><img src="assets/logos/${x.logo}.webp" alt="" width="46" height="46" loading="lazy"><div><strong>${esc(x.name)}</strong><span>${esc(x.role)}${x.date ? ` · ${esc(x.date)}` : ""}</span></div></div>`;
   $("#voices").innerHTML = `<article class="v-featured"><div><blockquote>${esc(f.quote)}</blockquote>${who(f)}</div><div class="v-stat"><strong>${esc(f.stat)}</strong><span>${esc(f.statLabel)}</span></div></article>` +
     data.items.map(x => `<article class="v-card" style="--c:var(--${x.color})"><div><span class="mark ${x.color}" aria-hidden="true">“</span><blockquote>${esc(x.quote)}</blockquote></div>${who(x)}</article>`).join("");
   $("#depoimentos").hidden = false;
+  if (data.metrics) {
+    window.METRICS = data.metrics;
+    Object.entries(data.metrics).forEach(([id, list]) => {
+      const info = document.querySelector(`#toc-${id} .toc-info`);
+      if (info) info.insertAdjacentHTML("afterbegin", `<div class="metrics">${list.map(([v, l]) => `<div><strong>${esc(v)}</strong><span>${esc(l)}</span></div>`).join("")}</div><p class="as-of">${esc(data.asOf || "")}</p>`);
+    });
+    document.querySelectorAll("#toc > li.open .toc-panel").forEach(p => { p.style.height = "auto"; });
+  }
   if (hasGsap && !reduce) {
     gsap.from(".v-featured, .v-card", { y: 60, opacity: 0, duration: 0.9, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: "#voices", start: "top 85%" } });
     ScrollTrigger.refresh();
