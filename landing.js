@@ -184,44 +184,53 @@ if (fine && !reduce) {
 }
 
 const SYSTEMS = [
-  ["SEMA", "pub"], ["DEMUTRAN", "pub"], ["Protocolo SEAD", "pub"], ["SECOM", "pub"], ["Estágio PdF", "pub"], ["Integral Clínica", "priv"], ["VFIK", "priv"]
+  { name: "DEMUTRAN", client: "Departamento de Trânsito · Pau dos Ferros", kind: "pub", year: 2024, logo: "demutran" },
+  { name: "SEMA", client: "Secretaria de Meio Ambiente · Pau dos Ferros", kind: "pub", year: 2025, logo: "brasao" },
+  { name: "Protocolo SEAD", client: "Secretaria de Administração · Pau dos Ferros", kind: "pub", year: 2025, logo: "sead" },
+  { name: "SECOM", client: "Secretaria de Comunicação · Pau dos Ferros", kind: "pub", year: 2026, logo: "brasao" },
+  { name: "Estágio PdF", client: "Secretaria de Administração · Pau dos Ferros", kind: "pub", year: 2026, logo: "sead" },
+  { name: "Integral Clínica", client: "Fisioterapia e estética", kind: "priv", year: 2026, logo: "integral" },
+  { name: "VFIK", client: "Projetos e construções", kind: "priv", year: 2026, logo: "vfik" }
 ];
-const R = 96;
-const C = 2 * Math.PI * R;
-const GAP = 7;
-const SEG = C / SYSTEMS.length - GAP;
-$("#arcs").innerHTML = SYSTEMS.map(([name, kind], i) => `<circle class="arc ${kind}" cx="120" cy="120" r="${R}" stroke-dasharray="${SEG} ${C - SEG}" stroke-dashoffset="${-(i * (SEG + GAP) + GAP / 2)}" data-name="${esc(name)}" data-kind="${kind}" tabindex="0" aria-label="${esc(name)}"><title>${esc(name)}</title></circle>`).join("");
+const YEARS = [2024, 2025, 2026];
+$("#growth-cols").innerHTML = YEARS.map(y => {
+  const total = SYSTEMS.filter(x => x.year <= y).length;
+  const items = SYSTEMS.filter(x => x.year === y);
+  return `<div class="col"><div class="col-total"><strong data-total="${total}">${total}</strong><small>${y === 2024 ? "no ar" : "+" + items.length}</small></div><div class="stack">${items.map(x => `<div class="block ${x.kind}" tabindex="0" data-client="${esc(x.client)}" aria-label="${esc(x.name)}, ${x.year}, ${esc(x.client)}"><img src="assets/logos/${x.logo}.webp" alt="" width="42" height="42"><span>${esc(x.name)}</span></div>`).join("")}</div></div>`;
+}).join("");
+$("#growth-chart").insertAdjacentHTML("beforeend", `<div class="years" aria-hidden="true">${YEARS.map(y => `<span>${y}</span>`).join("")}</div>`);
 
-$$(".arc").forEach(arc => {
-  arc.dataset.dash = arc.getAttribute("stroke-dasharray");
-  if (hasGsap && !reduce) arc.setAttribute("stroke-dasharray", `0 ${C}`);
+$$(".col").forEach((col, i) => {
+  const base = 0.35 + i * 0.6;
+  $$(".block", col).forEach((bl, k) => bl.style.setProperty("--d", (base + k * 0.13).toFixed(2) + "s"));
+  col.style.setProperty("--td", (base + $$(".block", col).length * 0.13 + 0.45).toFixed(2) + "s");
 });
 
-function setCenter(num, label) {
-  const center = $(".donut-center");
-  center.classList.remove("swap");
-  void center.offsetWidth;
-  center.classList.add("swap");
-  $("#donut-num").textContent = num;
-  $("#donut-label").textContent = label;
+function countUp(el, from, to, ms) {
+  const start = performance.now();
+  (function step(t) {
+    const k = Math.min(1, (t - start) / ms);
+    el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(step);
+  })(start);
 }
-$$(".arc").forEach(arc => {
-  const on = () => { $("#donut").classList.add("hovering"); arc.classList.add("hot"); setCenter(arc.dataset.kind === "pub" ? "Público" : "Privado", arc.dataset.name); $("#donut-num").style.fontSize = "22px"; };
-  const off = () => { $("#donut").classList.remove("hovering"); arc.classList.remove("hot"); setCenter("7", "sistemas no ar"); $("#donut-num").style.fontSize = ""; };
-  arc.addEventListener("mouseenter", on);
-  arc.addEventListener("mouseleave", off);
-  arc.addEventListener("focus", on);
-  arc.addEventListener("blur", off);
-});
 
-function drawDonut() {
-  $(".impact").classList.add("drawn");
-  if (reduce || !hasGsap) return;
-  $$(".arc").forEach((arc, i) => {
-    gsap.fromTo(arc, { attr: { "stroke-dasharray": `0 ${C}` } }, { attr: { "stroke-dasharray": arc.dataset.dash }, duration: 0.55, delay: i * 0.12, ease: "power2.out" });
+function dropBlocks() {
+  const chart = $("#growth-chart");
+  if (chart.classList.contains("go")) return;
+  chart.classList.add("go");
+  if (reduce) return;
+  const totals = $$(".col-total strong");
+  totals.forEach((el, i) => {
+    const from = i ? Number(totals[i - 1].dataset.total) : 0;
+    el.textContent = from;
+    setTimeout(() => countUp(el, from, Number(el.dataset.total), 600), parseFloat(el.closest(".col").style.getPropertyValue("--td")) * 1000);
   });
-  gsap.from(".donut-center", { scale: 0.6, opacity: 0, duration: 0.8, ease: "back.out(1.8)" });
 }
+
+new IntersectionObserver((entries, obs) => {
+  if (entries[0].isIntersecting) { dropBlocks(); obs.disconnect(); }
+}, { threshold: 0.35 }).observe($("#growth-chart"));
 
 function splitWords(el) {
   const walk = node => {
@@ -263,9 +272,8 @@ if (hasGsap && !reduce) {
   });
   $$(".eyebrow:not(.hero .eyebrow)").forEach(e => gsap.from(e, { x: -20, opacity: 0, duration: 0.6, scrollTrigger: { trigger: e, start: "top 88%" } }));
 
-  ScrollTrigger.create({ trigger: ".impact", start: "top 70%", once: true, onEnter: drawDonut });
-  gsap.from(".callout", { y: 30, opacity: 0, duration: 0.8, stagger: 0.15, ease: "power3.out", delay: 0.5, scrollTrigger: { trigger: ".impact", start: "top 70%" } });
-  gsap.from(".impact-text > :not(.eyebrow)", { y: 30, opacity: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".impact", start: "top 75%" } });
+  gsap.from(".growth-text > :not(.eyebrow)", { y: 30, opacity: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: ".growth", start: "top 75%" } });
+  gsap.from(".g-num", { scale: 0, rotate: -30, duration: 0.7, stagger: 0.2, ease: "back.out(2)", scrollTrigger: { trigger: ".growth", start: "top 70%" } });
   $$("[data-count]").forEach(el => {
     const end = Number(el.dataset.count);
     const obj = { v: 0 };
@@ -275,7 +283,7 @@ if (hasGsap && !reduce) {
   const mm = gsap.matchMedia();
   mm.add("(min-width: 900px)", () => {
     const items = $$(".pain-list li");
-    const tl = gsap.timeline({ scrollTrigger: { trigger: ".pains", start: "top top", end: "+=" + items.length * 380, scrub: 0.6, pin: true } });
+    const tl = gsap.timeline({ scrollTrigger: { trigger: ".pains", start: () => "top " + $(".nav").offsetHeight, end: () => "+=" + items.length * 380, scrub: 0.6, pin: true, anticipatePin: 1, invalidateOnRefresh: true } });
     items.forEach((li, i) => {
       tl.to(li, { opacity: 1, duration: 0.2 }, i)
         .to($(".before", li), { "--strike": "100%", color: "rgba(19,18,16,.35)", duration: 0.5 }, i + 0.1)
@@ -306,9 +314,13 @@ if (hasGsap && !reduce) {
   gsap.from(".faq details", { y: 24, opacity: 0, duration: 0.5, stagger: 0.06, scrollTrigger: { trigger: ".faq-list", start: "top 88%" } });
   gsap.from(".contact-form", { y: 60, opacity: 0, duration: 0.9, ease: "power3.out", scrollTrigger: { trigger: ".contact", start: "top 80%" } });
 
-  window.addEventListener("load", () => ScrollTrigger.refresh());
+  let refreshTimer;
+  const queueRefresh = () => { clearTimeout(refreshTimer); refreshTimer = setTimeout(() => ScrollTrigger.refresh(), 120); };
+  window.addEventListener("load", queueRefresh);
+  if (document.fonts) document.fonts.ready.then(queueRefresh);
+  $$("img").forEach(img => { if (!img.complete) img.addEventListener("load", queueRefresh, { once: true }); });
+  if ("ResizeObserver" in window) { let lastH = document.body.scrollHeight; new ResizeObserver(() => { const h = document.body.scrollHeight; if (Math.abs(h - lastH) > 4) { lastH = h; queueRefresh(); } }).observe(document.body); }
 } else {
-  drawDonut();
   $$(".hero .mark").forEach(m => m.classList.add("on"));
   $$(".before").forEach(b => b.style.setProperty("--strike", "100%"));
 }
