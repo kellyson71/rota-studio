@@ -96,6 +96,27 @@
 </footer>
 <script src="config.js"></script>
 <script>
+function fitLogos() {
+  document.querySelectorAll(".logo > span").forEach(box => {
+    const small = box.querySelector("small");
+    if (!small) return;
+    const word = box.firstChild;
+    const range = document.createRange();
+    range.selectNodeContents(word);
+    const target = range.getBoundingClientRect().width;
+    small.style.letterSpacing = "0px";
+    small.style.marginRight = "0px";
+    const natural = small.getBoundingClientRect().width;
+    const gaps = small.textContent.length - 1;
+    if (!target || !natural || gaps < 1) return;
+    const ls = (target - natural) / gaps;
+    small.style.letterSpacing = ls + "px";
+    small.style.marginRight = -ls + "px";
+  });
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(fitLogos);
+addEventListener("resize", fitLogos);
+
 const n = (window.ROTA_CONFIG || {}).whatsapp;
 if (n) document.querySelectorAll("[data-wa]").forEach(a => { a.href = `https://wa.me/${n}?text=${encodeURIComponent(a.dataset.wa)}`; a.target = "_blank"; a.rel = "noopener"; });
 </script>

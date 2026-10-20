@@ -1,3 +1,24 @@
+function fitLogos() {
+  document.querySelectorAll(".logo > span").forEach(box => {
+    const small = box.querySelector("small");
+    if (!small) return;
+    const word = box.firstChild;
+    const range = document.createRange();
+    range.selectNodeContents(word);
+    const target = range.getBoundingClientRect().width;
+    small.style.letterSpacing = "0px";
+    small.style.marginRight = "0px";
+    const natural = small.getBoundingClientRect().width;
+    const gaps = small.textContent.length - 1;
+    if (!target || !natural || gaps < 1) return;
+    const ls = (target - natural) / gaps;
+    small.style.letterSpacing = ls + "px";
+    small.style.marginRight = -ls + "px";
+  });
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(fitLogos);
+addEventListener("resize", fitLogos);
+
 const PROJECTS = [
   { id: "integral", logo: "integral", name: "Integral Clínica", what: "Agendamento online e prontuário", client: "Fisioterapia e estética", year: "2026", color: "r", url: "https://rafaelamagalhaes.com.br/agendar", host: "rafaelamagalhaes.com.br/agendar", result: "A paciente escolhe o serviço e o horário sozinha. A ficha de avaliação é assinada no iPad e os avisos saem pelo WhatsApp.", tags: ["Agenda", "Assinatura digital", "WhatsApp"] },
   { id: "sema", logo: "brasao", name: "SEMA", what: "Alvará ambiental pela internet", client: "Prefeitura de Pau dos Ferros", year: "2025", color: "g", url: "https://sema.protocolosead.com/", host: "sema.protocolosead.com", result: "O pedido de licença sai do balcão. A equipe técnica emite o parecer e o alvará é assinado digitalmente.", tags: ["Protocolo", "Parecer técnico", "Assinatura digital"] },
@@ -206,8 +227,8 @@ if (hasGsap && !reduce) {
   $$(".eyebrow:not(.hero .eyebrow)").forEach(e => gsap.from(e, { x: -20, opacity: 0, duration: 0.6, scrollTrigger: { trigger: e, start: "top 88%" } }));
 
   const stWords = splitWords($(".statement-text"));
-  gsap.fromTo(stWords, { opacity: 0.12 }, { opacity: 1, stagger: 0.05, ease: "none", scrollTrigger: { trigger: ".statement", start: "top 80%", end: "bottom 55%", scrub: true } });
-  gsap.from(".statement .n", { scale: 0.6, rotate: -8, duration: 0.7, stagger: 0.12, ease: "back.out(2)", scrollTrigger: { trigger: ".statement", start: "top 70%" } });
+  gsap.fromTo(stWords, { opacity: 0.15 }, { opacity: 1, stagger: 0.05, ease: "none", scrollTrigger: { trigger: ".statement", start: "top 80%", end: "bottom 60%", scrub: true } });
+  $$(".statement .n").forEach((n, i) => ScrollTrigger.create({ trigger: ".statement", start: "top 60%", once: true, onEnter: () => setTimeout(() => n.classList.add("on"), i * 180) }));
   $$("[data-count]").forEach(el => {
     const end = Number(el.dataset.count);
     const obj = { v: 0 };
@@ -250,6 +271,7 @@ if (hasGsap && !reduce) {
 
   window.addEventListener("load", () => ScrollTrigger.refresh());
 } else {
+  $$(".statement .n").forEach(n => n.classList.add("on"));
   $$(".hero .mark").forEach(m => m.classList.add("on"));
   $$(".before").forEach(b => b.style.setProperty("--strike", "100%"));
 }
