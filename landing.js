@@ -464,6 +464,64 @@ document.addEventListener("click", e => {
   history.replaceState(null, "", id ? "#" + id : location.pathname);
 });
 
+(function bridgeLine() {
+  const svg = $("#bridge");
+  const line = $("#bridge-path");
+  const reveal = $("#bridge-reveal");
+  const head = $("#bridge-head");
+  const from = $(".show-caption");
+  const core = $(".core");
+  if (!svg || !from || !core) return;
+  let L = 0, sy = 0, ey = 0;
+  function layout() {
+    const a = from.getBoundingClientRect();
+    const c = core.getBoundingClientRect();
+    const sx = a.left + a.width / 2;
+    sy = a.bottom + scrollY + 18;
+    const ex = c.left + c.width / 2;
+    ey = c.top + scrollY + c.height / 2;
+    const dy = ey - sy;
+    const swing = Math.min(220, innerWidth * 0.14);
+    const d = `M${sx.toFixed(1)} ${sy.toFixed(1)} C${(sx - swing).toFixed(1)} ${(sy + dy * 0.45).toFixed(1)} ${(ex + swing).toFixed(1)} ${(ey - dy * 0.55).toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+    line.setAttribute("d", d);
+    reveal.setAttribute("d", d);
+    svg.style.height = (ey + 40) + "px";
+    L = reveal.getTotalLength();
+    reveal.style.strokeDasharray = L;
+    update();
+  }
+  function update() {
+    if (!L) return;
+    const p = reduce ? 1 : Math.max(0, Math.min(1, (scrollY + innerHeight * 0.62 - sy) / (ey - sy)));
+    reveal.style.strokeDashoffset = L * (1 - p);
+    const pt = reveal.getPointAtLength(L * p);
+    head.setAttribute("cx", pt.x);
+    head.setAttribute("cy", pt.y);
+    svg.classList.toggle("moving", p > 0.01 && p < 0.985);
+    core.classList.toggle("lit", p >= 0.985);
+  }
+  let raf = 0;
+  addEventListener("scroll", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); }, { passive: true });
+  addEventListener("resize", layout);
+  addEventListener("load", layout);
+  if (document.fonts) document.fonts.ready.then(layout);
+  if (hasGsap) ScrollTrigger.addEventListener("refresh", layout);
+  layout();
+})();
+
+fetch("depoimentos.json").then(r => (r.ok ? r.json() : null)).then(data => {
+  if (!data) return;
+  const f = data.featured;
+  const who = (x, c) => `<div class="v-who"><img src="assets/logos/${x.logo}.webp" alt="" width="46" height="46" loading="lazy"><div><strong>${esc(x.name)}</strong><span>${esc(x.role)}</span></div></div>`;
+  $("#voices").innerHTML = `<article class="v-featured"><div><blockquote>${esc(f.quote)}</blockquote>${who(f)}</div><div class="v-stat"><strong>${esc(f.stat)}</strong><span>${esc(f.statLabel)}</span></div></article>` +
+    data.items.map(x => `<article class="v-card" style="--c:var(--${x.color})"><div><span class="mark ${x.color}" aria-hidden="true">“</span><blockquote>${esc(x.quote)}</blockquote></div>${who(x)}</article>`).join("");
+  $("#depoimentos").hidden = false;
+  if (hasGsap && !reduce) {
+    gsap.from(".v-featured, .v-card", { y: 60, opacity: 0, duration: 0.9, stagger: 0.1, ease: "power3.out", scrollTrigger: { trigger: "#voices", start: "top 85%" } });
+    ScrollTrigger.refresh();
+  }
+}).catch(() => {});
+
 $$(".faq details").forEach(d => d.addEventListener("toggle", () => { if (d.open) $$(".faq details").forEach(o => { if (o !== d) o.open = false; }); }));
 
 $("#contact-form").addEventListener("submit", async e => {

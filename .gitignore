@@ -5,3 +5,5 @@ node_modules/
 .env
 .env.*
 .DS_Store
+opcoes.html
+depoimentos.json

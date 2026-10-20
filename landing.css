@@ -77,7 +77,8 @@ li.teasing .toc-more, .toc-row:hover .toc-more, .toc-row:focus-visible .toc-more
 .price { margin: 22px 0 2px; font: 800 44px/1 var(--display); letter-spacing: -1.5px; }
 .price small { display: block; font: 500 13px var(--body); letter-spacing: 0; color: var(--muted); margin-bottom: 6px; }
 .pack.featured .price small, .pack.featured .monthly { color: rgba(255, 253, 248, .65); }
-.monthly { margin: 6px 0 22px; font-size: 14px; color: var(--ink-2); }
+.price-ask { display: inline-flex; align-self: flex-start; margin: 20px 0 22px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--line); font-size: 14px; font-weight: 700; color: var(--ink-2); }
+.pack.featured .price-ask { border-color: rgba(255, 253, 248, .25); color: rgba(255, 253, 248, .8); }
 .pack ul { list-style: none; padding: 22px 0 0; margin: 0 0 28px; border-top: 1px solid var(--line); display: grid; gap: 10px; flex: 1; }
 .pack.featured ul { border-color: rgba(255, 253, 248, .18); }
 .pack li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 15px; }
@@ -145,6 +146,39 @@ li.teasing .toc-more, .toc-row:hover .toc-more, .toc-row:focus-visible .toc-more
 .o-chip.priv.on { background: var(--g); border-color: var(--g); color: #fff; transform: translateY(-2px); }
 
 .orbit-stage { position: relative; perspective: 1200px; }
+.bridge { position: absolute; left: 0; top: 0; width: 100%; height: 0; overflow: visible; pointer-events: none; z-index: 0; }
+.bridge-line { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 2 9; stroke-linecap: round; opacity: .55; }
+#bridge-head { fill: var(--y); stroke: var(--ink); stroke-width: 2; opacity: 0; transition: opacity .3s; }
+.bridge.moving #bridge-head { opacity: 1; }
+.core { transition: scale .8s cubic-bezier(.3, 1.6, .5, 1), box-shadow .5s; }
+.core.lit { box-shadow: 0 0 0 8px rgba(255, 184, 0, .28); animation: corePop .6s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes corePop { 40% { scale: 1.12; } }
+
+.voices { padding: 0 0 110px; }
+.voices-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; padding-inline: var(--pad); }
+.v-featured { grid-column: span 12; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, .8fr); gap: clamp(24px, 4vw, 60px); align-items: center; background: var(--ink); color: #fff; border-radius: 32px; padding: clamp(28px, 4vw, 56px); position: relative; overflow: hidden; }
+.v-featured::before { content: "“"; position: absolute; left: clamp(18px, 3vw, 40px); top: -.08em; font: 800 clamp(140px, 15vw, 220px)/1 var(--display); color: var(--y); }
+.v-featured blockquote { position: relative; margin: 0; padding-top: clamp(40px, 5vw, 70px); font: 700 clamp(22px, 2.3vw, 32px)/1.3 var(--display); letter-spacing: -.02em; }
+.v-stat { text-align: center; border-left: 1px solid rgba(255, 255, 255, .15); padding-left: clamp(20px, 3vw, 50px); }
+.v-stat strong { display: block; font: 800 clamp(64px, 7vw, 104px)/1 var(--display); letter-spacing: -3px; color: var(--y); }
+.v-stat span { color: rgba(255, 255, 255, .7); font-size: 16px; }
+.v-who { display: flex; align-items: center; gap: 12px; margin-top: 26px; }
+.v-who img { width: 46px; height: 46px; border-radius: 50%; background: #fff; padding: 4px; object-fit: contain; }
+.v-who strong { display: block; font: 800 17px var(--display); }
+.v-who span { font-size: 14px; color: var(--muted); }
+.v-featured .v-who span { color: rgba(255, 255, 255, .65); }
+.v-card { grid-column: span 6; display: flex; flex-direction: column; justify-content: space-between; background: #fff; border-radius: 28px; padding: clamp(24px, 3vw, 36px); position: relative; transition: transform .45s cubic-bezier(.3, 1.4, .5, 1); }
+.v-card:hover { transform: translateY(-6px); }
+.v-card .mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--c); color: #fff; font: 800 34px/1 var(--display); padding-top: 12px; margin-bottom: 18px; }
+.v-card .mark.y { color: var(--ink); }
+.v-card blockquote { margin: 0; font-size: clamp(17px, 1.4vw, 19px); line-height: 1.55; color: var(--ink); }
+.v-card .v-who img { border: 2px solid var(--c); }
+@media (max-width: 900px) {
+  .v-featured { grid-template-columns: minmax(0, 1fr); }
+  .v-stat { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .15); padding: 22px 0 0; text-align: left; }
+  .voices-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; padding-bottom: 12px; scrollbar-width: none; }
+  .v-featured, .v-card { flex: 0 0 86%; scroll-snap-align: center; }
+}
 .tether { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; transition: opacity .3s; }
 .tether.on { opacity: 1; }
 .tether path { fill: none; stroke: var(--b); stroke-width: 2.5; stroke-linecap: round; }

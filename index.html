@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="landing.css">
 </head>
 <body>
+<svg class="bridge" id="bridge" aria-hidden="true"><defs><mask id="bridge-mask" maskUnits="userSpaceOnUse"><path id="bridge-reveal" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/></mask></defs><path id="bridge-path" class="bridge-line" fill="none" mask="url(#bridge-mask)"/><circle id="bridge-head" r="7"/></svg>
 <header class="nav" id="top">
   <a class="logo" href="#top" aria-label="Indexa Tecnologia, início"><img src="assets/indexa-mark.svg" alt="" width="34" height="34"><span>indexa<small>tecnologia</small></span></a>
   <nav aria-label="Seções">
@@ -104,6 +105,14 @@
     <ol class="toc" id="toc"></ol>
   </section>
 
+  <section class="voices" id="depoimentos" hidden>
+    <div class="head">
+      <p class="eyebrow">Depoimentos</p>
+      <h2 class="split">Quem usa todo dia.</h2>
+    </div>
+    <div class="voices-grid" id="voices"></div>
+  </section>
+
   <section class="services" id="servicos">
     <div class="head">
       <p class="eyebrow">Serviços</p>
@@ -122,14 +131,13 @@
     <div class="head">
       <p class="eyebrow">Pacotes</p>
       <h2 class="split">Escolha por onde começar.</h2>
-      <p class="sub">Valores de referência. O preço final sai na proposta, depois de entender o seu caso.</p>
+      <p class="sub">Cada projeto tem orçamento próprio, feito depois de uma conversa para entender o seu caso.</p>
     </div>
     <div class="pack-grid">
       <article class="pack">
         <p class="pack-for">Para quem só está no Instagram</p>
         <h3>Presença</h3>
-        <p class="price"><small>a partir de</small>R$ 800</p>
-        <p class="monthly">+ R$ 80/mês de hospedagem e suporte</p>
+        <p class="price-ask">Orçamento sob consulta</p>
         <ul><li>Site profissional de uma página</li><li>WhatsApp, horários e mapa a um toque</li><li>Domínio e hospedagem configurados</li><li>Pronto para aparecer no Google</li></ul>
         <a class="btn" data-wa="Olá! Vi o site da Indexa e tenho interesse no pacote Presença (site profissional)." href="#contato"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.7l4.8-1.3A9.8 9.8 0 1 0 12 2.2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8.6 7.3c.3-.5.6-.5.9-.5h.6c.2 0 .4 0 .6.5l.8 1.9c.1.3 0 .5-.1.7l-.6.7c-.1.2-.2.4 0 .6.6 1.1 1.6 2.1 2.8 2.7.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.4.4 0 .5-.1 1.2-.6 1.6-.5.4-1.3.8-2.3.6-1.7-.3-3.6-1.6-4.9-3.1-1.2-1.4-1.9-2.8-1.9-4 0-.8.3-1.4.5-1.8z" fill="currentColor"/></svg>Quero este</a>
       </article>
@@ -137,16 +145,14 @@
         <p class="pack-badge">Indicado para clínicas</p>
         <p class="pack-for">Para quem agenda pelo WhatsApp</p>
         <h3>Agenda</h3>
-        <p class="price"><small>a partir de</small>R$ 1.500</p>
-        <p class="monthly">+ R$ 150/mês de hospedagem e suporte</p>
+        <p class="price-ask">Orçamento sob consulta</p>
         <ul><li>Tudo do Presença</li><li>Agendamento online por serviço e horário</li><li>Lembrete automático no WhatsApp</li><li>Painel da recepção com a agenda do dia</li></ul>
         <a class="btn btn-wa" data-wa="Olá! Vi o site da Indexa e tenho interesse no pacote Agenda (agendamento online)." href="#contato"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.7l4.8-1.3A9.8 9.8 0 1 0 12 2.2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8.6 7.3c.3-.5.6-.5.9-.5h.6c.2 0 .4 0 .6.5l.8 1.9c.1.3 0 .5-.1.7l-.6.7c-.1.2-.2.4 0 .6.6 1.1 1.6 2.1 2.8 2.7.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.4.4 0 .5-.1 1.2-.6 1.6-.5.4-1.3.8-2.3.6-1.7-.3-3.6-1.6-4.9-3.1-1.2-1.4-1.9-2.8-1.9-4 0-.8.3-1.4.5-1.8z" fill="currentColor"/></svg>Quero este</a>
       </article>
       <article class="pack">
         <p class="pack-for">Para prefeituras e empresas</p>
         <h3>Sob medida</h3>
-        <p class="price"><small>a partir de</small>R$ 3.000</p>
-        <p class="monthly">+ R$ 200/mês de hospedagem e suporte</p>
+        <p class="price-ask">Orçamento sob consulta</p>
         <ul><li>Protocolos, inscrições ou painéis</li><li>Levantamento do processo atual</li><li>Entrega em etapas, com treinamento</li><li>Documentação para contratação pública</li></ul>
         <a class="btn" data-wa="Olá! Vi o site da Indexa e quero conversar sobre um sistema sob medida." href="#contato"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.7l4.8-1.3A9.8 9.8 0 1 0 12 2.2z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8.6 7.3c.3-.5.6-.5.9-.5h.6c.2 0 .4 0 .6.5l.8 1.9c.1.3 0 .5-.1.7l-.6.7c-.1.2-.2.4 0 .6.6 1.1 1.6 2.1 2.8 2.7.2.1.4.1.6-.1l.7-.8c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.4.4 0 .5-.1 1.2-.6 1.6-.5.4-1.3.8-2.3.6-1.7-.3-3.6-1.6-4.9-3.1-1.2-1.4-1.9-2.8-1.9-4 0-.8.3-1.4.5-1.8z" fill="currentColor"/></svg>Quero conversar</a>
       </article>
