@@ -9,6 +9,7 @@
   --lime-2: #ecfcb8;
   --violet: #b9a4ff;
   --violet-2: #ece6ff;
+  --blue: #a4b9ff;
   --orange: #ff8a4c;
   --orange-2: #ffe4d2;
   --pink: #ff7eb6;
@@ -460,7 +461,7 @@ dialog:not([open]) { display: none !important; }
 .status-win { background: var(--lime); }
 .status-no { background: var(--red-2); }
 .person-k { background: var(--violet); border: 1.5px solid var(--ink); }
-.person-j { background: var(--orange); border: 1.5px solid var(--ink); }
+.person-j { background: var(--blue); border: 1.5px solid var(--ink); }
 .person-none { border: 1.5px dashed var(--ink); }
 .field .select-wrap, .field .select-trigger { width: 100%; min-height: 44px; }
 .select-menu { position: fixed; z-index: 100; background: var(--paper); border: var(--border); border-radius: 14px; box-shadow: var(--shadow-lg); padding: 6px; overflow: auto; overscroll-behavior: contain; animation: pop .16s var(--ease); width: 240px; }

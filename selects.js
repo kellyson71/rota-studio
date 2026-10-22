@@ -15,6 +15,7 @@
         "Proposta enviada": [ "▤", "status-reply" ],
         Fechado: [ "✓", "status-win" ],
         "Sem interesse": [ "−", "status-no" ],
+        "Não compensa": [ "×", "status-no" ],
         "Mais tarde": [ "◴", "status-new" ],
         Kellyson: [ "K", "person-k" ],
         Jeyce: [ "J", "person-j" ],

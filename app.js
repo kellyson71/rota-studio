@@ -23,6 +23,7 @@ const STATUS = {
   "Proposta enviada": { icon: "▤", tone: "reply", label: "Proposta enviada" },
   "Fechado": { icon: "✓", tone: "win", label: "Fechado" },
   "Sem interesse": { icon: "−", tone: "no", label: "Sem interesse" },
+  "Não compensa": { icon: "×", tone: "no", label: "Não compensa" },
   "Mais tarde": { icon: "◴", tone: "new", label: "Mais tarde" }
 };
 const STATUSES = Object.keys(STATUS);
@@ -34,7 +35,7 @@ const STAGES = [
   { id: "vacuo", label: "No vácuo", icon: "◷", match: c => c.status === "Aguardando resposta", drop: "Aguardando resposta" },
   { id: "conversa", label: "Conversando", icon: "↩", match: c => TALKING.includes(c.status), drop: "Respondeu" },
   { id: "fechado", label: "Fechados", icon: "✓", match: c => c.status === "Fechado", drop: "Fechado" },
-  { id: "parado", label: "Parados", icon: "−", match: c => ["Sem interesse", "Mais tarde"].includes(c.status), drop: "Mais tarde" }
+  { id: "parado", label: "Parados", icon: "−", match: c => ["Sem interesse", "Mais tarde", "Não compensa"].includes(c.status), drop: "Mais tarde" }
 ];
 const QUALIFICATION = { "COMPENSA": ["vale a pena", "", "hot"], "NAO COMPENSA": ["não compensa", "", "cold"], "bleh, ate que vai": ["bleh, até que vai", "", "meh"] };
 const PRIORITY_RANK = { Urgente: 0, Alta: 1, Normal: 2, Baixa: 3 };
@@ -136,6 +137,10 @@ function setStatus(c, status) {
   log(c, `${STATUS[from]?.label || from} → ${STATUS[status]?.label || status}`, "status");
   Store.saveContact(c);
   const undo = () => restore(c, snap);
+  if (status === "Não compensa") {
+    openDrawer(c.id);
+    $("#d-not-worth-reason")?.focus();
+  }
   if (status === "Fechado") {
     confetti();
     toast(pick(JOKES.closed), undo);
@@ -689,6 +694,7 @@ function renderDrawer() {
   <section class="d-block">
     <h3>Etapa</h3>
     <div class="status-grid">${STATUSES.map(s => `<button class="st-btn tone-${STATUS[s].tone} ${c.status === s ? "on" : ""}" data-action="set-status" data-id="${c.id}" data-value="${esc(s)}" type="button" aria-pressed="${c.status === s}"><b>${STATUS[s].icon}</b>${esc(STATUS[s].label)}</button>`).join("")}</div>
+    ${c.status === "Não compensa" || c.notWorthReason ? `<div class="field"><label for="d-not-worth-reason">Por que não compensa? (opcional)</label><textarea id="d-not-worth-reason" data-field="notWorthReason" data-id="${c.id}" rows="3" placeholder="Ex.: orçamento baixo para o escopo, prazo inviável ou fora do nosso foco.">${esc(c.notWorthReason || "")}</textarea><p class="hint">Registrem o contexto para a dupla consultar depois. Salvo automaticamente.</p></div>` : ""}
     <h3>Quem cuida</h3>
     <div class="seg small">${["", ...TEAM].map(o => `<button class="${(c.owner || "") === o ? "on" : ""}" data-action="set-owner" data-id="${c.id}" data-value="${o}" type="button">${o ? personDot(o) : ""}${esc(ownerLabel(o))}</button>`).join("")}</div>
   </section>
@@ -1479,9 +1485,9 @@ document.addEventListener("input", e => {
       c[ui.drawerTemplate] = el.value;
       Store.saveContact(c, { debounce: true, silent: true });
     } else ui.drawerDraft = el.value;
-  } else if (f === "notes") {
+  } else if (f === "notes" || f === "notWorthReason") {
     const c = byId(el.dataset.id);
-    c.notes = el.value;
+    c[f] = el.value;
     Store.saveContact(c, { debounce: true, silent: true });
   } else if (f === "project-notes" || f === "project-scope") {
     const p = projectById(el.dataset.id);
