@@ -122,7 +122,7 @@ body.locked .sidebar #nav, body.locked .tabbar { display: none; }
 .avatar.lg { width: 54px; height: 54px; font-size: 18px; border-radius: 15px; box-shadow: var(--shadow); }
 .person { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--ink); font: 800 11px var(--display); flex-shrink: 0; background: var(--paper); }
 .person.p-kellyson { background: var(--violet); }
-.person.p-jeyce { background: var(--orange); }
+.person.p-jeyce { background: var(--blue); }
 .person.p-none { border-style: dashed; color: var(--muted); }
 
 .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 99px; padding: 2px 9px 2px 7px; font-size: 12px; font-weight: 700; border: 1.5px solid var(--ink); white-space: nowrap; }
