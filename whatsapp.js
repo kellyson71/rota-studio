@@ -1,6 +1,7 @@
 /* Agendamentos no Supabase; execução exclusivamente no computador vinculado. */
 (() => {
-  let state = { devices: [], messages: [], replies: [], blocks: [] };
+  let state = { devices: [], messages: [], replies: [], blocks: [], drafts: [] };
+  let pendingCount = 0, badgeTimer;
   let timer, loading = false, draft = {}, filter = 'all', requestId = null;
   const labels = { offline: 'PC desconectado', starting: 'Abrindo WhatsApp', qr: 'Escaneie o QR', authenticated: 'Carregando conversas', ready: 'Conectado', error: 'Precisa de atenção', queued: 'Agendada', sending: 'Enviando', sent: 'Enviada', failed: 'Falhou antes do envio', uncertain: 'Conferir no WhatsApp', cancelled: 'Cancelada' };
   const date = value => value ? new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza', dateStyle: 'short', timeStyle: 'short' }) : 'Ainda não conectado';
@@ -26,6 +27,7 @@
     remember();
     return `<section class="page-head"><div><span class="kicker">Indexa · WhatsApp</span><h1>Uma conversa de cada vez.</h1><p>Agende por aqui. Seu computador cuida do envio no horário escolhido.</p></div><button class="btn" id="wa-refresh" type="button">↻ Atualizar</button></section>
     <div id="wa-error" class="wa-setup" role="alert" hidden></div>
+        <section class="wa-card wa-drafts" id="wa-drafts" hidden></section>
     <div class="wa-layout">
       <section class="wa-card"><span class="kicker">01 · preparar</span><h2>Agendar mensagem</h2>
         <form id="wa-compose" class="form">
@@ -64,7 +66,29 @@
     } catch (error) { showError(error); }
     finally { loading = false; }
   }
+  const chip = (text, cls = '') => `<span class="wa-badge ${cls}">${esc(text)}</span>`;
+  function drawDrafts() {
+    const box = document.querySelector('#wa-drafts');
+    if (!box) return;
+    pendingCount = state.drafts.length;
+    box.hidden = !state.drafts.length;
+    if (!state.drafts.length) return;
+    const active = document.activeElement?.closest?.('.wa-draft')?.dataset.id;
+    const typed = Object.fromEntries([...box.querySelectorAll('textarea[data-draft]')].map(t => [t.dataset.draft, t.value]));
+    box.innerHTML = `<span class="kicker">agente · modo sombra</span><h2>Respostas para aprovar (${state.drafts.length})</h2><p class="hint">Nada sai sem você. Edite o texto e aprove, ou descarte e responda pelo seu celular.</p>` + state.drafts.map(r => {
+      const c = Store.contacts.find(c => c.id === r.contact_id), d = r.decision || {};
+      const text = typed[r.id] ?? r.suggestion;
+      return `<article class="wa-job wa-draft" data-id="${esc(r.id)}"><div class="wa-job-head"><div><strong>${esc(c?.name || '+' + r.phone)}</strong><small> · +${esc(r.phone)} · ${date(r.created_at)}</small></div><div>${d.urgencia ? chip('Urgente', 'failed') : ''}${d.temperatura ? chip(d.temperatura) : ''}${d.intencao ? chip(d.intencao) : ''}</div></div>
+        <p class="wa-quote">“${esc(r.inbound_body)}”</p>
+        <label for="draft-${esc(r.id)}">Sua resposta${r.suggestion ? ' (sugerida pelo agente)' : ' (sem sugestão: escreva você)'}</label>
+        <textarea id="draft-${esc(r.id)}" data-draft="${esc(r.id)}" maxlength="4000" rows="4">${esc(text)}</textarea>
+        <p class="hint">Por que chegou aqui: ${esc(d.why || '—')}${(d.issues || []).length ? ' · bloqueado pelo validador: ' + esc(d.issues.join('; ')) : ''}</p>
+        <div class="form-actions"><button class="btn primary small" type="button" data-wa="draft-approve" data-id="${esc(r.id)}">Aprovar e enviar</button><button class="btn small" type="button" data-wa="draft-reject" data-id="${esc(r.id)}">Descartar</button><a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/${esc(r.phone)}">Abrir no WhatsApp ↗</a></div></article>`;
+    }).join('');
+    if (active) box.querySelector(`.wa-draft[data-id="${active}"] textarea`)?.focus();
+  }
   function draw() {
+    drawDrafts();
     const devSelect = document.querySelector('#wa-device');
     const desired = devSelect.value || draft.device;
     const choices = state.devices.filter(d => d.enabled);
@@ -78,6 +102,14 @@
   }
   async function action(button) {
     const { wa, id } = button.dataset;
+    if (wa === 'draft-approve' || wa === 'draft-reject') {
+      const approve = wa === 'draft-approve', text = document.querySelector(`textarea[data-draft="${id}"]`)?.value || '';
+      if (approve && /\{[^}]+\}/.test(text)) return showError(new Error('Substitua os campos entre chaves antes de aprovar.'));
+      button.disabled = true;
+      try { await Store.waRpc('wa_draft_decide', { p_id: id, p_action: approve ? 'approve' : 'reject', p_text: approve ? text : null }); toast(approve ? 'Resposta na fila: sai em até 1 minuto' : 'Rascunho descartado'); await refresh(); }
+      catch (error) { showError(error); button.disabled = false; }
+      return;
+    }
     if (wa === 'reuse') {
       const m = state.messages.find(m => m.id === id);
       document.querySelector('#wa-contact').value = m.contact_id || '';
@@ -184,6 +216,12 @@
     timer = setInterval(() => { if (!document.querySelector('#wa-compose')) return clearInterval(timer); if (!document.hidden) void refresh(); }, 10000);
   }
   window.addEventListener('hashchange', remember);
-  Store.onChange(reason => { if (reason === 'auth' && !Store.user) { draft = {}; state = { devices: [], messages: [], replies: [], blocks: [] }; clearInterval(timer); } });
-  window.WhatsApp = { page, bind, canStart, quickStart, compose(c) { draft = { contact: c.id, phone: phone(c.phone), body: messageFor(c), time: defaultDate() }; requestId = null; } };
+  Store.onChange(reason => { if (reason === 'auth' && !Store.user) { draft = {}; state = { devices: [], messages: [], replies: [], blocks: [], drafts: [] }; pendingCount = 0; clearInterval(timer); clearInterval(badgeTimer); } });
+  // Contador do menu: consulta leve a cada 30s enquanto a equipe está logada.
+  async function updateBadge() {
+    if (document.hidden) return;
+    try { const n = await Store.waDraftCount(); if (n !== pendingCount) { pendingCount = n; if (typeof renderChrome === 'function') renderChrome(); } } catch {}
+  }
+  Store.onChange(reason => { if (reason === 'load' && Store.mode === 'cloud') { clearInterval(badgeTimer); void updateBadge(); badgeTimer = setInterval(updateBadge, 30000); } });
+  window.WhatsApp = { pending: () => pendingCount, page, bind, canStart, quickStart, compose(c) { draft = { contact: c.id, phone: phone(c.phone), body: messageFor(c), time: defaultDate() }; requestId = null; } };
 })();

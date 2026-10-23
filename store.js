@@ -175,11 +175,18 @@
       client.from("wa_devices").select("id,name,enabled,paused,interval_seconds,status,heartbeat_at,qr,last_error,created_at").order("created_at"),
       client.from("wa_messages").select("*").order("created_at", { ascending: false }).limit(100),
       client.from("wa_replies").select("*").order("received_at", { ascending: false }).limit(30),
-      client.from("wa_blocks").select("*")
+      client.from("wa_blocks").select("*"),
+      client.from("wa_drafts").select("*").eq("status", "pending").order("created_at").limit(30)
     ]);
-    const failed = results.find(r => r.error);
+    const failed = results.slice(0, 4).find(r => r.error);
     if (failed) throw failed.error;
-    return Object.fromEntries(["devices", "messages", "replies", "blocks"].map((key, i) => [key, results[i].data || []]));
+    // Rascunhos são opcionais: sem a migração do agente a aba continua funcionando.
+    return Object.fromEntries(["devices", "messages", "replies", "blocks", "drafts"].map((key, i) => [key, results[i].data || []]));
+  };
+  Store.waDraftCount = async () => {
+    if (!client || !Store.member) return 0;
+    const { count, error } = await client.from("wa_drafts").select("id", { count: "exact", head: true }).eq("status", "pending");
+    return error ? 0 : count || 0;
   };
 
   async function loadCloud() {

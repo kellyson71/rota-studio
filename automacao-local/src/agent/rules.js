@@ -18,10 +18,13 @@ const HOURS = /^(qual (e )?(o )?horario( de (atendimento|funcionamento))?|que ho
 const ADDRESS = /^(qual (o )?endereco|onde (voces )?(ficam|fica)|onde (e|eh) (o escritorio|a empresa))\??$/;
 const SITE = /^(qual (e )?o (seu |de voces )?(site|link)|tem site|voces tem site|cade o site|manda o site)\??$/;
 
+const MEDIA = /^\[(ptt|audio|image|video|document|sticker|location|vcard|multi_vcard)\]$/;
+
 export function route({ text, kb, blocked = false }) {
   const t = norm(text);
   if (!t || !/[\p{L}\p{N}]/u.test(t)) return { kind: 'ignore', reason: 'sem texto (emoji ou pontuação)' };
   if (blocked) return { kind: 'ignore', reason: 'contato bloqueado' };
+  if (MEDIA.test(String(text).trim())) return { kind: 'handoff', rule: 'media', reason: 'áudio, imagem ou arquivo: ainda sem tratamento automático' };
   if (isOptOut(text)) return { kind: 'rule', rule: 'optout', block: true, status: 'Sem interesse', reply: 'Sem problema, não envio mais mensagens. Obrigado pelo retorno!' };
   if (COMPLAINT.test(t)) return { kind: 'handoff', rule: 'complaint', complaint: true, block: true, reason: 'reclamação ou desconfiança; sem resposta automática' };
   if (ROBOT.test(t)) return { kind: 'handoff', rule: 'robot', reason: 'perguntou se é robô; responder apenas com você' };

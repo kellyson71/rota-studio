@@ -36,3 +36,7 @@
 
 .icon-btn.go { background: var(--lime); }
 .icon-btn.go:hover { background: var(--lime-2); }
+.wa-drafts { margin-bottom: 20px; border-color: var(--ink); background: var(--lime-2); }
+.wa-drafts[hidden] { display: none; }
+.wa-quote { margin: 10px 0; padding: 10px 14px; border-left: 4px solid var(--ink); background: var(--paper); border-radius: 0 10px 10px 0; font-style: italic; overflow-wrap: anywhere; }
+.wa-draft { border-bottom: 1px solid var(--ink); }

@@ -8,6 +8,8 @@ import wwebjs from 'whatsapp-web.js';
 import QRCode from 'qrcode';
 import { Journal } from './journal.js';
 import { Runner, isOptOut, phoneKey } from './runner.js';
+import { AgentWorker } from './agent/worker.js';
+import { execFile } from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = process.env.INDEXA_DATA_DIR || path.join(root, 'data');
@@ -20,7 +22,8 @@ const localSecret = fs.readFileSync(localSecretPath, 'utf8').trim();
 let journal;
 let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : null;
 let cloud, runner, client, starting = false, stopping = false, qr = null, status = 'offline', lastError = null, cloudError = null;
-let watched = new Set();
+let watched = new Set(), worker;
+const kb = JSON.parse(fs.readFileSync(new URL('./agent/kb.json', import.meta.url), 'utf8'));
 const adapter = {
   get ready() { return status === 'ready'; },
   resolve: async phone => {
@@ -68,6 +71,7 @@ function setupCloud() {
     global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(20000) }) }
   });
   runner = new Runner({ rpc, journal, whatsapp: adapter });
+  worker = new AgentWorker({ rpc, journal, kb, notify: ({ name, body, decision }) => execFile('notify-send', ['-a', 'Indexa', `Rascunho do agente: ${name || 'contato'}`, `${body.slice(0, 120)}\n→ ${decision.why}`], () => {}) });
 }
 async function heartbeat() {
   if (!cloud) return;
@@ -103,7 +107,9 @@ async function connect() {
           phone = pairs?.[0]?.pn?.split('@')[0] || '';
         }
         if (!/^[1-9]\d{9,14}$/.test(phone) || !watched.has(phoneKey(phone))) return;
-        journal.reply({ p_id: message.id._serialized, p_phone: phone, p_body: message.body || `[${message.type}]`, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
+        const body = message.body || `[${message.type}]`;
+        journal.reply({ p_id: message.id._serialized, p_phone: phone, p_body: body, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
+        journal.agentEnqueue({ id: message.id._serialized, phone, body });
       } catch (error) { lastError = `Falha ao registrar resposta: ${error.message}`; }
     });
     await client.initialize();
@@ -157,11 +163,15 @@ const workTimer = setInterval(async () => {
   if (!runner || stopping) return;
   try { await runner.tick(); cloudError = null; } catch (error) { cloudError = error.message; }
 }, 5000);
+const agentTimer = setInterval(async () => {
+  if (!worker || stopping) return;
+  try { await worker.tick(); } catch (error) { cloudError = `Agente: ${error.message}`.slice(0, 300); }
+}, 5000);
 const reconnectTimer = setInterval(() => { if (config && ['offline','error'].includes(status) && !stopping) void connect(); }, 60000);
 async function shutdown() {
   if (stopping) return;
   stopping = true;
-  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(reconnectTimer);
+  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(reconnectTimer);
   server.close();
   const kill = setTimeout(() => process.exit(0), 12000);
   status = 'offline'; qr = null;

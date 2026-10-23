@@ -353,7 +353,7 @@ const NAV = [
   { id: "inicio", icon: "◈", label: "Hoje" },
   { id: "turbo", icon: "⚡︎", label: "Modo turbo", badge: () => contactsOf("private").filter(c => c.status === "A enviar").length },
   { id: "contatos", icon: "☷", label: "Contatos", badge: () => contactsOf("private").filter(c => TALKING.includes(c.status)).length, badgeHot: true },
-  { id: "whatsapp", icon: "◷", label: "WhatsApp" },
+  { id: "whatsapp", icon: "◷", label: "WhatsApp", badge: () => window.WhatsApp?.pending?.() || 0, badgeHot: true },
   { id: "projetos", icon: "▦", label: "Projetos", badge: () => Store.projects.filter(p => p.status !== "Entregue").length },
   { id: "prefeituras", icon: "⌂", label: "Prefeituras", later: true },
   { id: "materiais", icon: "▤", label: "Materiais", later: true }

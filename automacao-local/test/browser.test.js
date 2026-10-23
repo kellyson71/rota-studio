@@ -22,20 +22,32 @@ test('painel: revisão, agendamento, pausa, cancelamento e tela móvel', async t
   await page.evaluate(()=> {
     Store.mode='cloud';Store.member={name:'Kellyson'};Store.user={email:'fixture@test.local'};Store.ready=true;
     Store.contacts=[{id:'clinic-1',name:'Clínica <Teste>',person:'Ana',phone:'(84) 99999-1111',message:'Oi, tudo bem? Sou o Kellyson. Como vocês fazem hoje a confirmação dos pacientes para evitar faltas?',kind:'private',status:'A enviar'}];
-    window.fixture={devices:[{id:'device-1',name:'PC de teste',enabled:true,paused:false,interval_seconds:60,status:'ready',heartbeat_at:new Date().toISOString()}],messages:[],replies:[],blocks:[]};
+    window.fixture={devices:[{id:'device-1',name:'PC de teste',enabled:true,paused:false,interval_seconds:60,status:'ready',heartbeat_at:new Date().toISOString()}],messages:[],replies:[],blocks:[],drafts:[{id:'draft-1',contact_id:'clinic-1',phone:'5584999991111',inbound_body:'Quanto custa? <b>x</b>',suggestion:'Depende do escopo.',decision:{why:'preço exige aprovação',intencao:'preco',urgencia:true,issues:[]},status:'pending',created_at:new Date().toISOString()}]};
     window.calls=[];
     Store.waLoad=async()=>structuredClone(window.fixture);
     Store.waRpc=async(name,args)=> {
       window.calls.push({name,args});
       if(name==='wa_schedule') window.fixture.messages.push({id:args.p_id,device_id:args.p_device_id,contact_id:args.p_contact_id,name:args.p_name,phone:args.p_phone,body:args.p_body,status:'queued',scheduled_at:args.p_scheduled_at});
       if(name==='wa_control_device')window.fixture.devices[0].paused=args.p_paused;
-      if(name==='wa_cancel')window.fixture.messages.find(m=>m.id===args.p_id).status='cancelled';
+      if(name==='wa_draft_decide')window.fixture.drafts=[];
+          if(name==='wa_cancel')window.fixture.messages.find(m=>m.id===args.p_id).status='cancelled';
       return args.p_id;
     };
     location.hash='whatsapp';
   });
   await page.waitForSelector('#wa-compose');
   await page.waitForFunction(()=>document.querySelector('#wa-device').value==='device-1');
+  await page.waitForSelector('.wa-draft textarea');
+  assert.match(await page.$eval('.wa-draft',e=>e.textContent),/Quanto custa\? <b>x<\/b>/);
+  assert.equal(await page.$('.wa-draft b'),null,'texto do cliente é escapado');
+  await page.$eval('.wa-draft textarea',e=>{e.value='Depende do escopo. Qual o tamanho da equipe?';});
+  await page.click('[data-wa="draft-approve"]');
+  await page.waitForFunction(()=>window.calls.some(c=>c.name==='wa_draft_decide'));
+  const decided=await page.evaluate(()=>window.calls.find(c=>c.name==='wa_draft_decide').args);
+  assert.deepEqual(decided,{p_id:'draft-1',p_action:'approve',p_text:'Depende do escopo. Qual o tamanho da equipe?'});
+  await page.waitForFunction(()=>document.querySelector('#wa-drafts').hidden);
+  await page.evaluate(()=>{document.querySelector('#toast').style.display='none';});
+  await page.evaluate(()=>{window.calls.length=0;});
   await page.select('#wa-contact','clinic-1');
   assert.match(await page.$eval('#wa-body',e=>e.value),/confirmação dos pacientes/);
   assert.equal(await page.$eval('#wa-phone',e=>e.value),'5584999991111');
