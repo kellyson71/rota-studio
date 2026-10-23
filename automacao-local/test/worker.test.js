@@ -51,3 +51,34 @@ test('tarefas sobrevivem a um reinício do executor', t => {
   let j = new Journal(file); j.agentEnqueue(task); j.close(); j = new Journal(file);
   assert.equal(JSON.parse(j.agentNext().payload).id, 'in-1'); j.close(); rmSync(dir, { recursive: true });
 });
+
+test('modelo inacessível: espera crescente e, no fim, rascunho vazio para resposta manual', async t => {
+  const f = fixture(t, async () => ({ final: 'draft', unavailable: true, text: '', why: 'agente indisponível: sem rede' }));
+  f.journal.agentEnqueue(task);
+  for (let i = 0; i < 3; i++) {
+    await f.worker.tick();
+    assert.equal(f.calls.filter(c => c.name === 'wa_draft_create').length, 0, 'ainda tentando');
+    assert.equal(f.journal.agentNext(), undefined, 'aguardando a espera terminar');
+    f.journal.db.prepare('UPDATE agent_tasks SET next_at=0').run();
+  }
+  await f.worker.tick();
+  const draft = f.calls.find(c => c.name === 'wa_draft_create').args;
+  assert.equal(draft.p_suggestion, ''); assert.match(draft.p_decision.why, /indisponível/);
+});
+
+test('tarefa sem identificador não é enfileirada e a linha antiga é descartada ao abrir', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'indexa-poison-')); const file = join(dir, 'db.sqlite');
+  let j = new Journal(file); j.agentEnqueue({ phone: '5584999991111', body: 'sem id' }); assert.equal(j.agentNext(), undefined);
+  j.db.prepare('INSERT INTO agent_tasks(id,payload) VALUES(NULL,?)').run('{}'); assert.ok(j.agentNext()); j.close();
+  j = new Journal(file); assert.equal(j.agentNext(), undefined); j.close(); rmSync(dir, { recursive: true });
+});
+
+test('mensagens seguidas do mesmo contato geram um único rascunho, sobre a última', async t => {
+  const seen = []; const f = fixture(t, async args => { seen.push(args.message); return { final: 'draft', text: 'resposta única', why: 'x' }; });
+  f.journal.agentEnqueue({ ...task, id: 'm1', body: 'oi' }); f.journal.agentEnqueue({ ...task, id: 'm2', body: 'ola?' }); f.journal.agentEnqueue({ ...task, id: 'm3', body: 'olaa?' });
+  f.journal.agentEnqueue({ id: 'o1', phone: '5584888882222', body: 'outro contato' });
+  while (await f.worker.tick()) { /* processa tudo */ }
+  assert.deepEqual(seen, ['olaa?', 'outro contato']);
+  assert.equal(f.calls.filter(c => c.name === 'wa_draft_create').length, 2);
+  assert.equal(f.calls.find(c => c.name === 'wa_draft_create').args.p_inbound_id, 'm3');
+});

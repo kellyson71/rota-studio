@@ -54,7 +54,7 @@ export async function handleInbound({ message, history = [], kb, contact = {}, b
   if (routed.kind === 'rule') return { final: 'send', rule: routed.rule, text: routed.reply, block: routed.block, status: routed.status, why: `regra ${routed.rule}` };
   let result;
   try { result = await llm(buildPrompt({ kb, history, message, contact, now })); }
-  catch (error) { return { final: 'draft', why: `agente indisponível: ${error.message}`, text: '' }; }
+  catch (error) { return { final: 'draft', unavailable: true, why: `agente indisponível: ${error.message}`, text: '' }; }
   const decision = result.json;
   const issues = validate(decision, { kb, lastSent, contactPrice: contact.price });
   const verdict = decide({ decision, issues, mode });

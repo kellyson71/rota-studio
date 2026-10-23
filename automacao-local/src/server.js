@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import wwebjs from 'whatsapp-web.js';
 import QRCode from 'qrcode';
 import { Journal } from './journal.js';
-import { Runner, isOptOut, phoneKey } from './runner.js';
+import { Runner, isOptOut, phoneKey, msgId } from './runner.js';
 import { AgentWorker } from './agent/worker.js';
 import { execFile } from 'node:child_process';
 
@@ -22,7 +22,7 @@ const localSecret = fs.readFileSync(localSecretPath, 'utf8').trim();
 let journal;
 let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : null;
 let cloud, runner, client, starting = false, stopping = false, qr = null, status = 'offline', lastError = null, cloudError = null;
-let watched = new Set(), worker;
+let watched = new Set(), watchedPhones = [], worker, catching = false, authSince = 0;
 const kb = JSON.parse(fs.readFileSync(new URL('./agent/kb.json', import.meta.url), 'utf8'));
 const adapter = {
   get ready() { return status === 'ready'; },
@@ -32,20 +32,8 @@ const adapter = {
     catch (error) { throw new Error(`Falha ao localizar o número (${error.message})`); }
   },
   beforeSend: async (address, job) => {
-    // Recupera respostas recebidas enquanto o PC estava desligado. Lê o modelo da conversa direto:
-    // WWebJS.getChat quebra ao serializar conversas com identificador @lid.
-    let recent;
-    try {
-      recent = await client.pupPage.evaluate((id, since) => {
-        const chat = window.require('WAWebCollections').Chat.get(id);
-        if (!chat) return [];
-        const ignore = ['call_log', 'e2e_notification', 'gp2', 'notification', 'notification_template', 'protocol'];
-        return chat.msgs.getModelsArray()
-          .filter(m => !m.id.fromMe && m.id._serialized && m.t >= since && !ignore.includes(m.type))
-          .slice(-50).map(m => ({ id: m.id._serialized, body: m.body || '', type: m.type, t: m.t }));
-      }, address, new Date(job.created_at).getTime() / 1000);
-    } catch (error) { throw new Error(`Falha ao conferir respostas (${error.message})`); }
-    for (const message of recent) {
+    // Recupera respostas recebidas enquanto o PC estava desligado.
+    for (const message of await inboundSince(address, new Date(job.created_at).getTime() / 1000)) {
       journal.reply({ p_id: message.id, p_phone: job.phone, p_body: message.body || `[${message.type}]`, p_received_at: new Date(message.t * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
     }
   },
@@ -73,9 +61,39 @@ function setupCloud() {
   runner = new Runner({ rpc, journal, whatsapp: adapter });
   worker = new AgentWorker({ rpc, journal, kb, notify: ({ name, body, decision }) => execFile('notify-send', ['-a', 'Indexa', `Rascunho do agente: ${name || 'contato'}`, `${body.slice(0, 120)}\n→ ${decision.why}`], () => {}) });
 }
+// Lê o modelo da conversa direto: WWebJS.getChat quebra ao serializar conversas com identificador @lid.
+async function inboundSince(address, since) {
+  try {
+    return await client.pupPage.evaluate((id, since) => {
+      const chat = window.require('WAWebCollections').Chat.get(id);
+      if (!chat) return [];
+      const ignore = ['call_log', 'e2e_notification', 'gp2', 'notification', 'notification_template', 'protocol'];
+      return chat.msgs.getModelsArray()
+        .filter(m => !m.id.fromMe && m.t >= since && !ignore.includes(m.type))
+        .slice(-50).map(m => ({ id: String(m.id.toString()), body: m.body || '', type: m.type, t: m.t }));
+    }, address, since);
+  } catch (error) { throw new Error(`Falha ao conferir respostas (${error.message})`); }
+}
+// Rede de segurança: mensagens que chegaram com o PC desligado, reiniciando ou antes de o WhatsApp ficar pronto.
+async function catchUp() {
+  if (catching || status !== 'ready' || !watchedPhones.length) return;
+  catching = true;
+  try {
+    for (const phone of watchedPhones) {
+      try {
+        const address = await adapter.resolve(phone);
+        if (!address) continue;
+        for (const m of await inboundSince(address, Date.now() / 1000 - 48 * 3600)) {
+          journal.reply({ p_id: m.id, p_phone: phone, p_body: m.body || `[${m.type}]`, p_received_at: new Date(m.t * 1000).toISOString(), p_optout: isOptOut(m.body || '') });
+          journal.agentEnqueue({ id: m.id, phone, body: m.body || `[${m.type}]` });
+        }
+      } catch (error) { lastError = `Varredura: ${error.message}`.slice(0, 200); }
+    }
+  } finally { catching = false; }
+}
 async function heartbeat() {
   if (!cloud) return;
-  try { const result = await rpc('wa_heartbeat', { p_status: status, p_qr: qr, p_error: lastError }); watched = new Set((result.watched || []).map(phoneKey)); cloudError = null; }
+  try { const result = await rpc('wa_heartbeat', { p_status: status, p_qr: qr, p_error: lastError }); watchedPhones = result.watched || []; watched = new Set(watchedPhones.map(phoneKey)); cloudError = null; }
   catch (error) { cloudError = error.message; }
 }
 async function connect() {
@@ -94,8 +112,8 @@ async function connect() {
       try { qr = await QRCode.toDataURL(value, { width: 300, margin: 2 }); status = 'qr'; await heartbeat(); }
       catch (error) { lastError = error.message; }
     });
-    client.on('authenticated', () => { status = 'authenticated'; qr = null; void heartbeat(); });
-    client.on('ready', () => { status = 'ready'; qr = null; lastError = null; void heartbeat(); });
+    client.on('authenticated', () => { status = 'authenticated'; authSince = Date.now(); qr = null; void heartbeat(); });
+    client.on('ready', () => { status = 'ready'; qr = null; lastError = null; void heartbeat().then(catchUp); });
     client.on('auth_failure', message => { status = 'error'; qr = null; lastError = String(message); void heartbeat(); });
     client.on('disconnected', reason => { status = 'offline'; qr = null; lastError = String(reason); void heartbeat(); });
     client.on('message', async message => {
@@ -108,8 +126,10 @@ async function connect() {
         }
         if (!/^[1-9]\d{9,14}$/.test(phone) || !watched.has(phoneKey(phone))) return;
         const body = message.body || `[${message.type}]`;
-        journal.reply({ p_id: message.id._serialized, p_phone: phone, p_body: body, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
-        journal.agentEnqueue({ id: message.id._serialized, phone, body });
+        const mid = msgId(message.id);
+        if (!mid) { lastError = 'Resposta recebida sem identificador; não foi registrada'; return; }
+        journal.reply({ p_id: mid, p_phone: phone, p_body: body, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
+        journal.agentEnqueue({ id: mid, phone, body });
       } catch (error) { lastError = `Falha ao registrar resposta: ${error.message}`; }
     });
     await client.initialize();
@@ -167,11 +187,26 @@ const agentTimer = setInterval(async () => {
   if (!worker || stopping) return;
   try { await worker.tick(); } catch (error) { cloudError = `Agente: ${error.message}`.slice(0, 300); }
 }, 5000);
-const reconnectTimer = setInterval(() => { if (config && ['offline','error'].includes(status) && !stopping) void connect(); }, 60000);
+const catchUpTimer = setInterval(() => { if (!stopping) void catchUp(); }, 180000);
+// Vigia: a biblioteca às vezes não emite "ready" mesmo com o WhatsApp Web totalmente carregado.
+// Com a página saudável, libera o estado pronto; sem isso, recria a conexão. A varredura cobre o tempo real.
+async function pageHealthy() {
+  try {
+    return await client.pupPage.evaluate(() => typeof window.WWebJS === 'object' && Boolean(window.AuthStore) && window.require('WAWebCollections').Chat.length > 0);
+  } catch { return false; }
+}
+const reconnectTimer = setInterval(async () => {
+  if (!config || stopping) return;
+  if (status === 'authenticated' && Date.now() - authSince > 60000) {
+    if (await pageHealthy()) { status = 'ready'; qr = null; lastError = 'Liberado pelo vigia: a biblioteca não emitiu "ready"'; void heartbeat().then(catchUp); }
+    else if (Date.now() - authSince > 150000) { status = 'offline'; lastError = 'O WhatsApp não ficou pronto em 150s; reconectando'; }
+  }
+  if (['offline', 'error'].includes(status)) void connect();
+}, 30000);
 async function shutdown() {
   if (stopping) return;
   stopping = true;
-  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(reconnectTimer);
+  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(catchUpTimer); clearInterval(reconnectTimer);
   server.close();
   const kill = setTimeout(() => process.exit(0), 12000);
   status = 'offline'; qr = null;

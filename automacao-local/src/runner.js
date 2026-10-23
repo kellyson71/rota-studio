@@ -1,4 +1,12 @@
 export const phoneKey = value => value.startsWith('55') && value.length === 13 && value[4] === '9' ? value.slice(0,4) + value.slice(5) : value;
+// O WhatsApp Web atual não expõe mais id._serialized: o identificador serializado vem em "$1".
+export const msgId = id => (typeof id === 'string' ? id : id?._serialized || id?.$1 || (id?.id && id.remote ? `${id.fromMe}_${id.remote._serialized || id.remote}_${id.id}` : null));
+// Um parágrafo vira uma mensagem (até 3; o que passar disso segue junto na última).
+export function splitParts(body) {
+  const parts = String(body).split(/\n[ \t]*\n+/).map(x => x.trim()).filter(Boolean);
+  return parts.length > 3 ? [...parts.slice(0, 2), parts.slice(2).join('\n\n')] : parts;
+}
+const humanPause = () => new Promise(resolve => setTimeout(resolve, 2500 + Math.random() * 3500));
 export function isOptOut(text) {
   const s = text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/[.!?]+$/g, '');
   return /^(pare|parar|sair|stop|remover|cancelar|nao tenho interesse|sem interesse|nao me envie mais mensagens|nao quero receber mensagens|nao quero mais mensagens)$/.test(s)
@@ -9,7 +17,7 @@ export function isOptOut(text) {
 }
 
 export class Runner {
-  constructor({ rpc, journal, whatsapp }) { Object.assign(this, { rpc, journal, whatsapp }); this.busy = false; }
+  constructor({ rpc, journal, whatsapp, pause = humanPause }) { Object.assign(this, { rpc, journal, whatsapp, pause }); this.busy = false; }
   async flush() {
     // Respostas primeiro: cancelam os próximos agendamentos antes de buscar tarefas.
     for (const row of this.journal.replies()) {
@@ -41,9 +49,20 @@ export class Runner {
         }
         if (!this.whatsapp.ready) throw new Error('WhatsApp desconectou antes do envio');
         attempted = true;
-        const sent = await this.whatsapp.send(address, job.body);
-        if (!sent?.id?._serialized) throw new Error('WhatsApp não retornou confirmação');
-        this.journal.finish(job.id, 'sent', sent.id._serialized);
+        const parts = splitParts(job.body);
+        let remoteId = null;
+        for (let i = 0; i < parts.length; i++) {
+          if (i > 0) await this.pause();
+          try {
+            const id = msgId((await this.whatsapp.send(address, parts[i]))?.id);
+            if (!id) throw new Error('WhatsApp não retornou confirmação');
+            remoteId ??= id;
+          } catch (error) {
+            if (i === 0) throw error;
+            throw new Error(`A parte ${i + 1} de ${parts.length} não foi confirmada; as anteriores já saíram. Confira o WhatsApp (${error.message})`);
+          }
+        }
+        this.journal.finish(job.id, 'sent', remoteId);
       } catch (error) {
         this.journal.finish(job.id, attempted ? 'uncertain' : 'failed', null, String(error.message).slice(0, 500));
       }
