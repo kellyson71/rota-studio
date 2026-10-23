@@ -33,3 +33,6 @@
 .wa-connection textarea { width: 100%; min-height: 130px; font: 12px var(--mono); }
 @media(max-width: 950px) { .wa-layout { grid-template-columns: 1fr; } }
 @media(max-width: 500px) { .wa-grid { grid-template-columns: 1fr; } .wa-card { padding: 17px; } }
+
+.icon-btn.go { background: var(--lime); }
+.icon-btn.go:hover { background: var(--lime-2); }

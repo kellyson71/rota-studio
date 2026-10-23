@@ -55,6 +55,17 @@ test('painel: revisão, agendamento, pausa, cancelamento e tela móvel', async t
   await page.click('[data-wa="cancel"]');
   await page.waitForFunction(()=>window.fixture.messages[0].status==='cancelled');
   await page.waitForFunction(()=>document.querySelector('#wa-jobs').textContent.includes('Cancelada'));
+  await page.evaluate(()=>{ window.fixture.messages=[]; window.fixture.devices[0].paused=false; window.calls.length=0; location.hash='contatos'; });
+  await page.waitForSelector('[data-action="wa-start"]');
+  await page.click('[data-action="wa-start"]');
+  await page.waitForSelector('#wa-confirm');
+  assert.equal(await page.evaluate(()=>window.calls.length),0,'abrir a revisão não agenda nada');
+  assert.match(await page.$eval('#modal',e=>e.textContent),/Hoje: 0 de 5/);
+  await page.click('#wa-confirm');
+  await page.waitForFunction(()=>window.calls.some(c=>c.name==='wa_schedule'));
+  const started=await page.evaluate(()=>window.calls.find(c=>c.name==='wa_schedule'));
+  assert.ok(Math.abs(Date.parse(started.args.p_scheduled_at)-Date.now())<60000,'envio imediato');
+  assert.equal(started.args.p_phone,'5584999991111');
   mkdirSync(new URL('../test-results/',import.meta.url),{recursive:true});
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:fileURLToPath(new URL('../test-results/painel-desktop.png',import.meta.url)),fullPage:true});

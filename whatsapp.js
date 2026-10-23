@@ -12,9 +12,14 @@
   const phoneKey = value => value.startsWith('55') && value.length === 13 && value[4] === '9' ? value.slice(0,4) + value.slice(5) : value;
   const defaultDate = () => new Date(Date.now() + 10 * 60000 - 3 * 3600000).toISOString().slice(0, 16);
   const eligible = () => Store.contacts.filter(c => c.kind !== 'government' && phone(c.phone)).sort((a,b) => String(a.name || '').localeCompare(String(b.name || '')));
+  const contactOption = c => `<option value="${esc(c.id)}">${esc(c.name)}${['Sem interesse', 'Não compensa'].includes(c.status) ? ' · sem interesse' : c.status === 'Aguardando resposta' ? ' · retorno' : ''}</option>`;
+  const contactOptions = () => {
+    const all = eligible(), first = all.filter(c => c.status === 'A enviar'), rest = all.filter(c => c.status !== 'A enviar');
+    return `<optgroup label="Primeiro contato (${first.length})">${first.map(contactOption).join('')}</optgroup>${rest.length ? `<optgroup label="Retorno e outros">${rest.map(contactOption).join('')}</optgroup>` : ''}`;
+  };
   const badge = (status, text) => `<span class="wa-badge ${esc(status)}">${esc(text || labels[status] || status)}</span>`;
   const alive = d => d.heartbeat_at && Date.now() - new Date(d.heartbeat_at).getTime() < 45000;
-  const messageFor = c => c?.message?.trim() || `Oi${c?.person ? ', ' + c.person : ''}, tudo bem? Sou o Kellyson, desenvolvedor aqui de Pau dos Ferros. Como vocês cuidam disso hoje no dia a dia?`;
+  const messageFor = c => (c?.status === 'Aguardando resposta' && c.followupMessage?.trim()) || c?.message?.trim() || `Oi${c?.person ? ', ' + c.person : ''}, tudo bem? Sou o Kellyson, desenvolvedor aqui de Pau dos Ferros. Como vocês cuidam disso hoje no dia a dia?`;
   const remember = () => { const f = document.querySelector('#wa-compose'); if (f) draft = Object.fromEntries(new FormData(f)); };
 
   function page() {
@@ -24,7 +29,7 @@
     <div class="wa-layout">
       <section class="wa-card"><span class="kicker">01 · preparar</span><h2>Agendar mensagem</h2>
         <form id="wa-compose" class="form">
-          <div class="field"><label for="wa-contact">Contato da sua base</label><select data-native id="wa-contact" name="contact" required><option value="">Selecione um contato</option>${eligible().map(c => `<option value="${esc(c.id)}">${esc(c.name)}${['Sem interesse', 'Não compensa'].includes(c.status) ? ' · sem interesse' : ''}</option>`).join('')}</select></div>
+          <div class="field"><label for="wa-contact">Contato da sua base</label><select data-native id="wa-contact" name="contact" required><option value="">Selecione um contato</option>${contactOptions()}</select></div>
           <div class="wa-grid"><div class="field"><label for="wa-phone">WhatsApp com DDD e país</label><input id="wa-phone" name="phone" inputmode="tel" placeholder="5584999999999" required maxlength="30"></div><div class="field"><label for="wa-device">Enviar pelo computador</label><select data-native id="wa-device" name="device" required><option value="">Conecte um computador</option></select></div></div>
           <div class="field"><label for="wa-body">Mensagem que será enviada</label><textarea id="wa-body" name="body" required maxlength="4000" placeholder="Escolha um contato para preparar a abordagem."></textarea><p class="hint">Abordagem inicial: entender confirmação de consultas e faltas. Edite antes de enviar.</p></div>
           <div class="field"><label for="wa-time">Data e hora · Fortaleza (UTC−3)</label><input id="wa-time" name="time" type="datetime-local" required value="${defaultDate()}"></div>
@@ -134,6 +139,30 @@
       catch (error) { const box = document.querySelector('#wa-save-error'); if (box) box.textContent = errorText(error); else toast(errorText(error)); button.disabled = false; }
     };
   }
+  const DAILY_FIRST_CONTACTS = 5;
+  const today = value => new Date(value).toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' });
+  const canStart = c => Boolean(c && c.kind !== 'government' && c.status === 'A enviar' && phone(c.phone));
+  // Iniciar direto: revisão em um passo e envio imediato pela fila do computador vinculado.
+  async function quickStart(c) {
+    try {
+      const data = await Store.waLoad();
+      const n = phone(c.phone), d = data.devices.find(d => d.enabled && alive(d) && d.status === 'ready');
+      if (!d) return toast('Seu PC não está conectado ao WhatsApp. Abra a aba WhatsApp para ver o estado.');
+      if (['Sem interesse', 'Não compensa'].includes(c.status) || data.blocks.some(b => phoneKey(b.phone) === phoneKey(n))) return toast('Este contato está marcado para não receber mensagens.');
+      const body = messageFor(c).trim();
+      if (!body || /\{[^}]+\}/.test(body)) return toast('Complete a mensagem do contato antes de iniciar (há campos entre chaves).');
+      const already = data.messages.filter(m => m.phone && phoneKey(m.phone) === phoneKey(n) && ['queued', 'sending', 'sent', 'uncertain'].includes(m.status));
+      if (already.length) return toast('Este contato já tem mensagem agendada ou enviada. Veja a aba WhatsApp.');
+      const todayCount = data.messages.filter(m => ['queued', 'sending', 'sent', 'uncertain'].includes(m.status) && today(m.created_at) === today(Date.now())).length;
+      const args = { p_id: crypto.randomUUID(), p_device_id: d.id, p_contact_id: c.id, p_phone: n, p_name: c.name, p_body: body, p_scheduled_at: new Date().toISOString() };
+      modal(`<h2>Iniciar conversa agora</h2><p><strong>${esc(c.name)}</strong> · +${esc(n)}<br>Sai em até 1 minuto, pelo ${esc(d.name)}.</p><div class="wa-review">${esc(body)}</div>${todayCount >= DAILY_FIRST_CONTACTS ? `<p class="wa-note">Hoje já são ${todayCount} envios na fila ou enviados (meta segura: ${DAILY_FIRST_CONTACTS} por dia). Considere deixar este para amanhã.</p>` : `<p class="hint">Hoje: ${todayCount} de ${DAILY_FIRST_CONTACTS} primeiros contatos.</p>`}<p id="wa-save-error" class="wa-error"></p><div class="form-actions"><button class="btn primary" id="wa-confirm" type="button">Enviar agora</button></div>`);
+      document.querySelector('#wa-confirm').onclick = async event => {
+        const button = event.currentTarget; button.disabled = true;
+        try { await Store.waRpc('wa_schedule', args); document.querySelector('#modal').close(); toast('Na fila: sai em até 1 minuto'); }
+        catch (error) { document.querySelector('#wa-save-error').textContent = errorText(error); button.disabled = false; }
+      };
+    } catch (error) { toast(errorText(error)); }
+  }
   function bind() {
     clearInterval(timer);
     const form = document.querySelector('#wa-compose');
@@ -156,5 +185,5 @@
   }
   window.addEventListener('hashchange', remember);
   Store.onChange(reason => { if (reason === 'auth' && !Store.user) { draft = {}; state = { devices: [], messages: [], replies: [], blocks: [] }; clearInterval(timer); } });
-  window.WhatsApp = { page, bind, compose(c) { draft = { contact: c.id, phone: phone(c.phone), body: messageFor(c), time: defaultDate() }; requestId = null; } };
+  window.WhatsApp = { page, bind, canStart, quickStart, compose(c) { draft = { contact: c.id, phone: phone(c.phone), body: messageFor(c), time: defaultDate() }; requestId = null; } };
 })();

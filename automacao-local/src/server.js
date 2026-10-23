@@ -23,15 +23,27 @@ let cloud, runner, client, starting = false, stopping = false, qr = null, status
 let watched = new Set();
 const adapter = {
   get ready() { return status === 'ready'; },
-  resolve: async phone => { watched.add(phoneKey(phone)); return (await client.getNumberId(phone))?._serialized; },
+  resolve: async phone => {
+    watched.add(phoneKey(phone));
+    try { return (await client.getNumberId(phone))?._serialized; }
+    catch (error) { throw new Error(`Falha ao localizar o número (${error.message})`); }
+  },
   beforeSend: async (address, job) => {
-    // Recupera respostas recebidas enquanto o PC estava desligado.
-    const chat = await client.getChatById(address);
-    const recent = await chat.fetchMessages({ limit: 50, fromMe: false });
+    // Recupera respostas recebidas enquanto o PC estava desligado. Lê o modelo da conversa direto:
+    // WWebJS.getChat quebra ao serializar conversas com identificador @lid.
+    let recent;
+    try {
+      recent = await client.pupPage.evaluate((id, since) => {
+        const chat = window.require('WAWebCollections').Chat.get(id);
+        if (!chat) return [];
+        const ignore = ['call_log', 'e2e_notification', 'gp2', 'notification', 'notification_template', 'protocol'];
+        return chat.msgs.getModelsArray()
+          .filter(m => !m.id.fromMe && m.id._serialized && m.t >= since && !ignore.includes(m.type))
+          .slice(-50).map(m => ({ id: m.id._serialized, body: m.body || '', type: m.type, t: m.t }));
+      }, address, new Date(job.created_at).getTime() / 1000);
+    } catch (error) { throw new Error(`Falha ao conferir respostas (${error.message})`); }
     for (const message of recent) {
-      if (!message.fromMe && message.timestamp * 1000 >= new Date(job.created_at).getTime()) {
-        journal.reply({ p_id: message.id._serialized, p_phone: job.phone, p_body: message.body || `[${message.type}]`, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
-      }
+      journal.reply({ p_id: message.id, p_phone: job.phone, p_body: message.body || `[${message.type}]`, p_received_at: new Date(message.t * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
     }
   },
   send: async (address, body) => {

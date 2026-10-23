@@ -635,6 +635,7 @@ function listView(rows) {
       <div class="row-actions">
         <button class="icon-btn" data-action="copy" data-id="${c.id}" data-mode="${mode}" title="Copiar mensagem" aria-label="Copiar mensagem para ${esc(shortName(c))}" type="button">⧉</button>
         <button class="icon-btn" data-action="go" data-id="${c.id}" data-mode="${mode}" title="Copiar e abrir canal" aria-label="Abrir canal de ${esc(shortName(c))}" type="button">↗</button>
+        ${Store.mode === "cloud" && window.WhatsApp?.canStart(c) ? `<button class="icon-btn go" data-action="wa-start" data-id="${c.id}" title="Iniciar conversa agora pelo WhatsApp" aria-label="Iniciar conversa com ${esc(shortName(c))}" type="button">▶</button>` : ""}
         <button class="icon-btn ok" data-action="sent" data-id="${c.id}" data-mode="${mode}" title="Já mandei" aria-label="Marcar enviado para ${esc(shortName(c))}" type="button">✓</button>
       </div>
     </article>`;
@@ -1314,6 +1315,7 @@ function bindPage() {
 }
 
 const actions = {
+  "wa-start": el => WhatsApp.quickStart(byId(el.dataset.id)),
   "wa-schedule": el => { const c = byId(el.dataset.id); $("#drawer").close(); WhatsApp.compose(c); location.hash = "whatsapp"; },
   open: el => openDrawer(el.dataset.id, el.dataset.template),
   copy: el => {
