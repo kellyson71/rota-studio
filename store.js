@@ -163,6 +163,25 @@
     await client.auth.signOut();
   };
 
+  Store.waRpc = async (name, args = {}) => {
+    if (!client || !Store.member) throw new Error("Entre com a conta da equipe para agendar envios.");
+    const { data, error } = await client.rpc(name, args);
+    if (error) throw error;
+    return data;
+  };
+  Store.waLoad = async () => {
+    if (!client || !Store.member) throw new Error("O agendamento precisa do login da equipe e do Supabase.");
+    const results = await Promise.all([
+      client.from("wa_devices").select("id,name,enabled,paused,interval_seconds,status,heartbeat_at,qr,last_error,created_at").order("created_at"),
+      client.from("wa_messages").select("*").order("created_at", { ascending: false }).limit(100),
+      client.from("wa_replies").select("*").order("received_at", { ascending: false }).limit(30),
+      client.from("wa_blocks").select("*")
+    ]);
+    const failed = results.find(r => r.error);
+    if (failed) throw failed.error;
+    return Object.fromEntries(["devices", "messages", "replies", "blocks"].map((key, i) => [key, results[i].data || []]));
+  };
+
   async function loadCloud() {
     Store.ready = false;
     if (!Store.user) {

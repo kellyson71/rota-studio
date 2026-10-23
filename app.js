@@ -353,6 +353,7 @@ const NAV = [
   { id: "inicio", icon: "◈", label: "Hoje" },
   { id: "turbo", icon: "⚡︎", label: "Modo turbo", badge: () => contactsOf("private").filter(c => c.status === "A enviar").length },
   { id: "contatos", icon: "☷", label: "Contatos", badge: () => contactsOf("private").filter(c => TALKING.includes(c.status)).length, badgeHot: true },
+  { id: "whatsapp", icon: "◷", label: "WhatsApp" },
   { id: "projetos", icon: "▦", label: "Projetos", badge: () => Store.projects.filter(p => p.status !== "Entregue").length },
   { id: "prefeituras", icon: "⌂", label: "Prefeituras", later: true },
   { id: "materiais", icon: "▤", label: "Materiais", later: true }
@@ -365,7 +366,7 @@ function renderChrome() {
     return `<a href="#${n.id}" class="${r === n.id ? "active" : ""}" ${r === n.id ? 'aria-current="page"' : ""}><b>${n.icon}</b><span>${n.label}</span>${b ? `<small class="${n.badgeHot ? "hot" : ""}">${b}</small>` : ""}</a>`;
   };
   $("#nav").innerHTML = NAV.filter(n => !n.later).map(item).join("") + '<div class="nav-sep">pra depois</div>' + NAV.filter(n => n.later).map(item).join("");
-  $("#tabbar").innerHTML = NAV.slice(0, 4).map(item).join("") + `<a href="#materiais" class="${["materiais", "prefeituras"].includes(r) ? "active" : ""}"><b>⋯</b><span>Mais</span></a>`;
+  $("#tabbar").innerHTML = NAV.filter(n => ["inicio", "contatos", "whatsapp", "projetos"].includes(n.id)).map(item).join("") + `<a href="#materiais" class="${["materiais", "prefeituras"].includes(r) ? "active" : ""}"><b>⋯</b><span>Mais</span></a>`;
   $("#crumb").innerHTML = `<span>Freelas Alto Oeste</span> / <strong>${esc(NAV.find(n => n.id === r)?.label || "Hoje")}</strong>`;
   const me = actor();
   if (Store.mode === "cloud") {
@@ -690,6 +691,7 @@ function renderDrawer() {
     <p class="hint">${TEMPLATES.find(t => t.id === tpl)?.stored ? "Suas edições ficam salvas nesse contato." : "Modelo rápido: edite antes de mandar."} ${c.price ? "Preço de referência: <strong>" + esc(c.price) + "</strong>" : ""}</p>
     <div class="channel-row">${ch.map((x, i) => `<button class="chan ${i ? "" : "main"}" data-action="go" data-id="${c.id}" data-channel="${esc(x.name)}" data-from="drawer" type="button"><b>${x.icon}</b>${esc(x.name)}</button>`).join("") || '<span class="hint">Nenhum canal. Clique em Editar e cole o WhatsApp ou @.</span>'}</div>
     <div class="d-actions"><button class="btn" data-action="copy" data-id="${c.id}" data-from="drawer" type="button">⧉ Copiar</button><button class="btn primary grow" data-action="sent" data-id="${c.id}" data-mode="${tpl === "message" ? "message" : "followupMessage"}" type="button">✓ Já mandei</button></div>
+    ${c.phone ? `<button class="btn small" data-action="wa-schedule" data-id="${esc(c.id)}" type="button">◷ Agendar no WhatsApp</button>` : ''}
   </section>
   <section class="d-block">
     <h3>Etapa</h3>
@@ -1273,9 +1275,10 @@ function render() {
     return;
   }
   ui.kind = r === "prefeituras" ? "government" : "private";
-  const pages = { inicio: homePage, turbo: turboPage, contatos: contactsPage, prefeituras: contactsPage, projetos: projectsPage, materiais: libraryPage };
+  const pages = { inicio: homePage, turbo: turboPage, contatos: contactsPage, prefeituras: contactsPage, projetos: projectsPage, materiais: libraryPage, whatsapp: () => WhatsApp.page() };
   $("#app").innerHTML = (pages[r] || homePage)();
   bindPage();
+  if (r === "whatsapp") WhatsApp.bind();
   if (r === "projetos") initBoards();
 }
 
@@ -1311,6 +1314,7 @@ function bindPage() {
 }
 
 const actions = {
+  "wa-schedule": el => { const c = byId(el.dataset.id); $("#drawer").close(); WhatsApp.compose(c); location.hash = "whatsapp"; },
   open: el => openDrawer(el.dataset.id, el.dataset.template),
   copy: el => {
     const c = byId(el.dataset.id);

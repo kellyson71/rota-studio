@@ -7,3 +7,7 @@ node_modules/
 .DS_Store
 opcoes.html
 depoimentos.json
+automacao-local/data/
+automacao-local/.wwebjs_cache/
+automacao-local/test-results/
+supabase/.temp/

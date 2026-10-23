@@ -9,6 +9,7 @@ Central de freelas da dupla: quem já recebeu mensagem, quem respondeu, quem sum
 - **Contatos**: lista ou quadro arrastável por etapa, busca (`/`), filtros, cadastro rápido (cole o WhatsApp, @ ou e-mail) e importação em lote.
 - **Ficha do contato**: modelos de mensagem (1º contato, retorno, marcar conversa, pós-conversa, proposta), etapa, responsável, resposta do cliente, lembrete de retorno, reunião, notas e histórico.
 - **Projetos**: briefing, escopo, tarefas detalhadas com checklist e cópia rápida.
+- **WhatsApp**: agendar mensagens pelo site, acompanhar respostas e pausar envios executados pelo PC. Instruções de ativação em [automacao-local/README.md](automacao-local/README.md).
 
 ## Supabase
 

@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import puppeteer from 'puppeteer';
+import { fileURLToPath } from 'node:url';
+import { mkdirSync } from 'node:fs';
+
+test('painel: revisão, agendamento, pausa, cancelamento e tela móvel', async t => {
+  const web = express(); web.use(express.static(fileURLToPath(new URL('../../',import.meta.url))));
+  const server = await new Promise(resolve => { const s=web.listen(0,'127.0.0.1',()=>resolve(s)); });
+  t.after(()=>server.close());
+  const browser=await puppeteer.launch({headless:true}); t.after(()=>browser.close());
+  const page=await browser.newPage(); const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  await page.setViewport({width:1440,height:1000});
+  await page.setRequestInterception(true);
+  page.on('request',r=> {
+    if (r.url().endsWith('/config.js')) return r.respond({status:200,contentType:'application/javascript',body:'window.ROTA_CONFIG={};'});
+    if (!r.url().startsWith('http://127.0.0.1:')) return r.abort();
+    r.continue();
+  });
+  await page.goto(`http://127.0.0.1:${server.address().port}/painel.html`);
+  await page.evaluate(()=> {
+    Store.mode='cloud';Store.member={name:'Kellyson'};Store.user={email:'fixture@test.local'};Store.ready=true;
+    Store.contacts=[{id:'clinic-1',name:'Clínica <Teste>',person:'Ana',phone:'(84) 99999-1111',kind:'private',status:'A enviar'}];
+    window.fixture={devices:[{id:'device-1',name:'PC de teste',enabled:true,paused:false,interval_seconds:60,status:'ready',heartbeat_at:new Date().toISOString()}],messages:[],replies:[],blocks:[]};
+    window.calls=[];
+    Store.waLoad=async()=>structuredClone(window.fixture);
+    Store.waRpc=async(name,args)=> {
+      window.calls.push({name,args});
+      if(name==='wa_schedule') window.fixture.messages.push({id:args.p_id,device_id:args.p_device_id,contact_id:args.p_contact_id,name:args.p_name,phone:args.p_phone,body:args.p_body,status:'queued',scheduled_at:args.p_scheduled_at});
+      if(name==='wa_control_device')window.fixture.devices[0].paused=args.p_paused;
+      if(name==='wa_cancel')window.fixture.messages.find(m=>m.id===args.p_id).status='cancelled';
+      return args.p_id;
+    };
+    location.hash='whatsapp';
+  });
+  await page.waitForSelector('#wa-compose');
+  await page.waitForFunction(()=>document.querySelector('#wa-device').value==='device-1');
+  await page.select('#wa-contact','clinic-1');
+  assert.match(await page.$eval('#wa-body',e=>e.value),/confirmação das consultas/);
+  assert.equal(await page.$eval('#wa-phone',e=>e.value),'5584999991111');
+  await page.click('#wa-review');await page.waitForSelector('#wa-confirm');
+  assert.equal(await page.evaluate(()=>window.calls.length),0);
+  assert.match(await page.$eval('.wa-review',e=>e.textContent),/Oi, Ana!/);
+  await page.click('#wa-confirm');
+  await page.waitForFunction(()=>window.calls.some(c=>c.name==='wa_schedule') && !document.querySelector('#modal').open);
+  const call=await page.evaluate(()=>window.calls.find(c=>c.name==='wa_schedule'));
+  assert.equal(call.args.p_phone,'5584999991111');assert.match(call.args.p_scheduled_at,/Z$/);
+  await page.waitForSelector('[data-wa="cancel"]');
+  assert.match(await page.$eval('#wa-jobs',e=>e.textContent),/Clínica <Teste>/);
+  assert.equal(await page.$('#wa-jobs teste'),null);
+  await page.click('[data-wa="pause"]');
+  await page.waitForFunction(()=>window.fixture.devices[0].paused);
+  await page.waitForFunction(()=>document.querySelector('[data-wa="pause"]').textContent==='Retomar fila');
+  await page.click('[data-wa="cancel"]');
+  await page.waitForFunction(()=>window.fixture.messages[0].status==='cancelled');
+  await page.waitForFunction(()=>document.querySelector('#wa-jobs').textContent.includes('Cancelada'));
+  mkdirSync(new URL('../test-results/',import.meta.url),{recursive:true});
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.screenshot({path:fileURLToPath(new URL('../test-results/painel-desktop.png',import.meta.url)),fullPage:true});
+  await page.setViewport({width:390,height:844});
+  await page.screenshot({path:fileURLToPath(new URL('../test-results/painel-mobile.png',import.meta.url)),fullPage:true});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'layout sem rolagem horizontal no celular');
+  assert.deepEqual(errors,[]);
+});

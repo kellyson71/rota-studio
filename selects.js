@@ -136,7 +136,7 @@
         };
     }
     function enhance() {
-        document.querySelectorAll("select:not([data-customized])").forEach(select => {
+        document.querySelectorAll("select:not([data-customized]):not([data-native])").forEach(select => {
             select.dataset.customized = "true";
             select.dataset.originalClass = select.className;
             const wrapper = document.createElement("span");
