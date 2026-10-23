@@ -14,7 +14,7 @@
   const eligible = () => Store.contacts.filter(c => c.kind !== 'government' && phone(c.phone)).sort((a,b) => String(a.name || '').localeCompare(String(b.name || '')));
   const badge = (status, text) => `<span class="wa-badge ${esc(status)}">${esc(text || labels[status] || status)}</span>`;
   const alive = d => d.heartbeat_at && Date.now() - new Date(d.heartbeat_at).getTime() < 45000;
-  const messageFor = c => `Oi${c?.person ? ', ' + c.person : ', pessoal'}! Sou ${Store.member?.name || 'Kellyson'}, desenvolvedor${Store.member?.name === 'Jeyce' ? 'a' : ''} aqui de Pau dos Ferros. Como vocês fazem hoje a confirmação das consultas para evitar faltas?`;
+  const messageFor = c => c?.message?.trim() || `Oi${c?.person ? ', ' + c.person : ''}, tudo bem? Sou o Kellyson, desenvolvedor aqui de Pau dos Ferros. Como vocês cuidam disso hoje no dia a dia?`;
   const remember = () => { const f = document.querySelector('#wa-compose'); if (f) draft = Object.fromEntries(new FormData(f)); };
 
   function page() {

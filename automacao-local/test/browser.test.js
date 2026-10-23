@@ -21,7 +21,7 @@ test('painel: revisão, agendamento, pausa, cancelamento e tela móvel', async t
   await page.goto(`http://127.0.0.1:${server.address().port}/painel.html`);
   await page.evaluate(()=> {
     Store.mode='cloud';Store.member={name:'Kellyson'};Store.user={email:'fixture@test.local'};Store.ready=true;
-    Store.contacts=[{id:'clinic-1',name:'Clínica <Teste>',person:'Ana',phone:'(84) 99999-1111',kind:'private',status:'A enviar'}];
+    Store.contacts=[{id:'clinic-1',name:'Clínica <Teste>',person:'Ana',phone:'(84) 99999-1111',message:'Oi, tudo bem? Sou o Kellyson. Como vocês fazem hoje a confirmação dos pacientes para evitar faltas?',kind:'private',status:'A enviar'}];
     window.fixture={devices:[{id:'device-1',name:'PC de teste',enabled:true,paused:false,interval_seconds:60,status:'ready',heartbeat_at:new Date().toISOString()}],messages:[],replies:[],blocks:[]};
     window.calls=[];
     Store.waLoad=async()=>structuredClone(window.fixture);
@@ -37,11 +37,11 @@ test('painel: revisão, agendamento, pausa, cancelamento e tela móvel', async t
   await page.waitForSelector('#wa-compose');
   await page.waitForFunction(()=>document.querySelector('#wa-device').value==='device-1');
   await page.select('#wa-contact','clinic-1');
-  assert.match(await page.$eval('#wa-body',e=>e.value),/confirmação das consultas/);
+  assert.match(await page.$eval('#wa-body',e=>e.value),/confirmação dos pacientes/);
   assert.equal(await page.$eval('#wa-phone',e=>e.value),'5584999991111');
   await page.click('#wa-review');await page.waitForSelector('#wa-confirm');
   assert.equal(await page.evaluate(()=>window.calls.length),0);
-  assert.match(await page.$eval('.wa-review',e=>e.textContent),/Oi, Ana!/);
+  assert.match(await page.$eval('.wa-review',e=>e.textContent),/Oi, tudo bem\? Sou o Kellyson/);
   await page.click('#wa-confirm');
   await page.waitForFunction(()=>window.calls.some(c=>c.name==='wa_schedule') && !document.querySelector('#modal').open);
   const call=await page.evaluate(()=>window.calls.find(c=>c.name==='wa_schedule'));
