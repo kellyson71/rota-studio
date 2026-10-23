@@ -1,5 +1,5 @@
 export const ACTIONS = ['responder', 'rascunho', 'escalar', 'encerrar'];
-export const INTENTS = ['preco', 'reuniao', 'duvida', 'interesse', 'objecao', 'outro'];
+export const INTENTS = ['contexto', 'duvida', 'interesse', 'outro', 'preco', 'reuniao', 'objecao', 'fora_do_assunto'];
 
 const norm = text => String(text || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
@@ -10,7 +10,7 @@ export function validate(decision, { kb, lastSent = '', contactPrice = '' }) {
   if (!INTENTS.includes(decision.intencao)) issues.push('intenção inválida');
   if (!(decision.confianca >= 0 && decision.confianca <= 1)) issues.push('confiança fora de 0 a 1');
   if (typeof decision.urgencia !== 'boolean') issues.push('urgência ausente');
-  if (decision.acao === 'encerrar') return issues;
+  if (decision.acao === 'encerrar' || decision.acao === 'escalar') return issues; // sem texto a enviar
   const text = String(decision.resposta || '');
   const n = norm(text);
   if (!text.trim()) return [...issues, 'resposta vazia'];

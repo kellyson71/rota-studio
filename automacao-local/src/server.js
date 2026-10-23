@@ -78,7 +78,9 @@ function setupCloud() {
     global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(20000) }) }
   });
   runner = new Runner({ rpc, journal, whatsapp: adapter });
-  worker = new AgentWorker({ rpc, journal, kb, notify: draft => {
+  worker = new AgentWorker({ rpc, journal, kb, mode: agentConfig.mode === 'live' ? 'live' : 'shadow', autoLimit: Number(agentConfig.autoLimit) || 10,
+    onAuto: draft => execFile('notify-send', ['-a', 'Indexa', `Respondido sozinho: ${draft.name || 'contato'}`, draft.suggestion.slice(0, 160)], () => {}),
+    notify: draft => {
     execFile('notify-send', ['-a', 'Indexa', `Rascunho do agente: ${draft.name || 'contato'}`, `${draft.body.slice(0, 120)}\n→ ${draft.decision.why}`], () => {});
     if (ownerPhone) { journal.noticeEnqueue(`draft:${draft.id}`, formatNotice(draft)); journal.reminderSet(draft.id, Date.now()); }
   } });
@@ -215,7 +217,7 @@ app.use('/api', (req, res, next) => {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return res.status(401).json({ error: 'Abra o endereço com a chave local, conforme o arquivo de acesso.' });
   next();
 });
-app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone) }));
+app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone), modoAgente: agentConfig.mode === 'live' ? 'live' : 'shadow' }));
 app.post('/api/config', async (req, res) => {
   if (config) return res.status(409).json({ error: 'Este executor já está vinculado. Para trocar, pare o serviço e remova data/connection.json.' });
   const { supabaseUrl, supabaseKey, token } = req.body;

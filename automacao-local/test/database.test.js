@@ -21,6 +21,7 @@ test('migração e regras da fila em PostgreSQL 16', async t => {
   sql(readFileSync(new URL('../../supabase/migrations/20261024_agente.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/20261025_rascunhos.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/20261026_aprovacao_whatsapp.sql',import.meta.url),'utf8'));
+  sql(readFileSync(new URL('../../supabase/migrations/20261027_resposta_automatica.sql',import.meta.url),'utf8'));
   const member = query => sql(`set role authenticated; set request.jwt.claims='{"email":"kellyson@rota-studio.app","sub":"11111111-1111-4111-8111-111111111111"}'; ${query}`);
   const anon = query => sql('set role anon; ' + query);
   const quote = value => "'" + String(value).replaceAll("'","''") + "'";
@@ -150,5 +151,27 @@ test('migração e regras da fila em PostgreSQL 16', async t => {
     assert.throws(()=>anon(`select wa_draft_decide_device('${d.token}','${cc}','approve');`),/não tem sugestão/);
     assert.throws(()=>anon(`select wa_draft_decide_device('${d.token}','ffff','approve');`));
     assert.throws(()=>member(`select wa_drafts_pending('${d.token}');`),'membro logado não usa a função do executor');
+  });
+  await t.test('resposta automática: entra na fila como agente, conta no limite e respeita bloqueio e dono', () => {
+    sql("update contacts set status='A enviar' where id='fixture-clinic'; delete from wa_blocks;");
+    const d=create();ready(d);schedule(d,{body:'Abertura automática'});
+    const mk=(id,sug)=>anon(`select wa_draft_create('${d.token}','${id}','5584999991111','msg','${sug}','{}'::jsonb);`);
+    const before=JSON.parse(anon(`select wa_agent_context('${d.token}','5584999991111');`)).autoCount;
+    const a=mk('auto-1','Pergunta de descoberta?');
+    const other=create(); assert.throws(()=>anon(`select wa_draft_autosend('${other.token}','${a}');`),'outro computador não envia');
+    assert.equal(JSON.parse(anon(`select wa_draft_autosend('${d.token}','${a}');`)).status,'approved');
+    assert.equal(sql("select status from wa_messages where body='Pergunta de descoberta?';"),'queued');
+    assert.equal(sql(`select decision->>'via' from wa_drafts where id='${a}';`),'agente');
+    assert.equal(JSON.parse(anon(`select wa_agent_context('${d.token}','5584999991111');`)).autoCount,before+1);
+    assert.throws(()=>anon(`select wa_draft_autosend('${d.token}','${a}');`),/já foi decidido/);
+    member("select wa_block('5584999991111',true);");
+    const b=mk('auto-2','Outra pergunta?');
+    assert.throws(()=>anon(`select wa_draft_autosend('${d.token}','${b}');`),/não contatar/);
+    assert.equal(sql(`select status from wa_drafts where id='${b}';`),'pending','falhou: continua para o dono decidir');
+    member("select wa_block('5584999991111',false);");
+    const c=mk('auto-3','Via código'); const code=c.replace(/-/g,'').slice(0,4);
+    assert.equal(JSON.parse(anon(`select wa_draft_decide_device('${d.token}','${code}','approve');`)).status,'approved','aprovação por código segue funcionando');
+    assert.equal(sql(`select decision->>'via' from wa_drafts where id='${c}';`),'whatsapp');
+    assert.throws(()=>anon("select wa__approve(gen_random_uuid(),gen_random_uuid(),null,'x');"),'função interna não é exposta');
   });
 });

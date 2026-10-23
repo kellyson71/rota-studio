@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { Journal } from '../src/journal.js';
 import { AgentWorker } from '../src/agent/worker.js';
 
-function fixture(t, handle, rpcOverride) {
+function fixture(t, handle, rpcOverride, opts = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'indexa-worker-'));
   const journal = new Journal(join(dir, 'db.sqlite'));
   t.after(() => { journal.close(); rmSync(dir, { recursive: true, force: true }); });
@@ -17,8 +17,9 @@ function fixture(t, handle, rpcOverride) {
     if (name === 'wa_agent_context') return { contact: { id: 'c1', name: 'Clínica X', price: 'R$ 1.500 + R$ 150/mês' }, blocked: false, history: [{ de: 'eu', texto: 'Abertura' }, { de: 'cliente', texto: 'Quanto custa?' }] };
     if (name === 'wa_draft_create') return 'draft-1';
   };
-  const worker = new AgentWorker({ rpc, journal, kb: {}, handle, notify: n => notices.push(n) });
-  return { journal, worker, calls, notices };
+  const autos = [];
+  const worker = new AgentWorker({ rpc, journal, kb: {}, handle, notify: n => notices.push(n), onAuto: d => autos.push(d), ...opts });
+  return { journal, worker, calls, notices, autos };
 }
 const task = { id: 'in-1', phone: '5584999991111', body: 'Quanto custa?' };
 
@@ -103,4 +104,36 @@ test('diário: comando é tratado uma vez só, aviso sai uma vez e lembrete guar
   f.journal.noticeEnqueue('draft:1', 'aviso'); f.journal.noticeEnqueue('draft:1', 'aviso repetido');
   assert.equal(f.journal.noticesPending().length, 1); f.journal.noticeSent('draft:1'); assert.equal(f.journal.noticesPending().length, 0);
   assert.equal(f.journal.reminderLast('d1'), null); f.journal.reminderSet('d1', 1000); f.journal.reminderSet('d1', 2000); assert.equal(f.journal.reminderLast('d1'), 2000);
+});
+
+const safe = async () => ({ final: 'send', text: 'E ainda acontece de paciente faltar?', why: 'resposta segura', intencao: 'contexto' });
+test('modo live: resposta segura sai sozinha, sem incomodar o dono', async t => {
+  const f = fixture(t, safe, null, { mode: 'live', inHours: () => true });
+  f.journal.agentEnqueue(task); await f.worker.tick();
+  assert.ok(f.calls.some(c => c.name === 'wa_draft_autosend' && c.args.p_id === 'draft-1'));
+  assert.equal(f.notices.length, 0); assert.equal(f.autos.length, 1);
+});
+test('modo live: fora do horário, no teto por contato ou com falha no envio, vira aviso ao dono', async t => {
+  const fora = fixture(t, safe, null, { mode: 'live', inHours: () => false });
+  fora.journal.agentEnqueue(task); await fora.worker.tick();
+  assert.ok(!fora.calls.some(c => c.name === 'wa_draft_autosend')); assert.match(fora.notices[0].decision.why, /fora do horário/);
+  const ctx = { contact: { name: 'X' }, blocked: false, history: [], autoCount: 10 };
+  const teto = fixture(t, safe, n => n === 'wa_agent_context' ? ctx : n === 'wa_draft_create' ? 'd' : undefined, { mode: 'live', inHours: () => true });
+  teto.journal.agentEnqueue(task); await teto.worker.tick();
+  assert.ok(!teto.calls.some(c => c.name === 'wa_draft_autosend')); assert.match(teto.notices[0].decision.why, /10 respostas automáticas/);
+  const falha = fixture(t, safe, n => { if (n === 'wa_draft_autosend') throw new Error('Contato está na lista de não contatar'); return n === 'wa_draft_create' ? 'd' : { contact: null, blocked: false, history: [] }; }, { mode: 'live', inHours: () => true });
+  falha.journal.agentEnqueue(task); await falha.worker.tick();
+  assert.match(falha.notices[0].decision.why, /não foi possível: Contato está na lista/); assert.equal(falha.autos.length, 0);
+});
+test('rascunho que precisa de decisão segue para o dono também no modo live', async t => {
+  const f = fixture(t, async () => ({ final: 'draft', text: 'Começa em R$ 1.500.', why: 'intenção preco exige aprovação', intencao: 'preco' }), null, { mode: 'live', inHours: () => true });
+  f.journal.agentEnqueue(task); await f.worker.tick();
+  assert.ok(!f.calls.some(c => c.name === 'wa_draft_autosend')); assert.equal(f.notices.length, 1);
+});
+test('descadastro e encerramento não criam rascunho nem aviso', async t => {
+  for (const handle of [async () => ({ final: 'send', rule: 'optout', text: 'Sem problema', why: 'regra optout' }), async () => ({ final: 'close', text: '', why: 'cliente recusou' })]) {
+    const f = fixture(t, handle, null, { mode: 'live', inHours: () => true });
+    f.journal.agentEnqueue(task); await f.worker.tick();
+    assert.ok(!f.calls.some(c => c.name === 'wa_draft_create')); assert.equal(f.notices.length, 0); assert.equal(f.journal.agentNext(), undefined);
+  }
 });

@@ -141,7 +141,8 @@ export const breakerState = (now = Date.now()) => Object.fromEntries(Object.entr
 
 function recordFailure(id, error, now, random) {
   const h = rec(id); h.fails++; h.lastError = String(error.message).slice(0, 200);
-  h.until = now + cooldownFor(error.kind, h.fails, error.retryAfterMs, random);
+  // Resposta vazia ou JSON quebrado é problema daquela resposta, não da rota: só pune a partir da 3ª seguida.
+  h.until = error.kind === 'formato' && h.fails < 3 ? 0 : now + cooldownFor(error.kind, h.fails, error.retryAfterMs, random);
 }
 function recordSuccess(id, ms, now) { const h = rec(id); h.fails = 0; h.slow = 0; h.until = 0; h.lastError = null; h.okAt = now; h.ms = h.ms == null ? ms : Math.round(h.ms * 0.7 + ms * 0.3); }
 
@@ -193,6 +194,7 @@ export function askModel(prompt, { providers = PROVIDERS, hedgeAfterMs = 10 * SE
         if (settled || error.kind === 'cancelado') return;
         recordFailure(p.id, error, now(), random);
         errors.push(error.message);
+        if (error.kind === 'formato' && !p.retried) queue.unshift({ ...p, retried: true }); // mesma rota, de novo, uma vez
         launch(); // falhou: o próximo entra na hora, sem esperar o reforço
       });
     }

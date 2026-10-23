@@ -90,3 +90,15 @@ test('DeepSeek: cada erro vira o tipo certo; 429 respeita Retry-After', async ()
   await assert.rejects(run(429, { 'retry-after': '12' }), e => e.kind === 'limite' && e.retryAfterMs === 12000);
   await assert.rejects(run(500), e => e.kind === 'limite');
 });
+
+test('resposta vazia: tenta de novo na mesma rota na hora e não tira a rota do ar', async () => {
+  resetBreaker(); let calls = 0;
+  const flaky = { id: 'ds', group: 'ds', run: async () => (++calls === 1 ? '' : '{"acao":"responder"}') };
+  const r = await askModel('p', { providers: [flaky] });
+  assert.equal(r.model, 'ds'); assert.equal(calls, 2); assert.deepEqual(breakerState(), {});
+});
+test('formato quebrado 3 vezes seguidas aí sim põe a rota em espera', async () => {
+  resetBreaker(); const lixo = { id: 'lixo', group: 'g', run: async () => 'sem json' };
+  for (let i = 0; i < 2; i++) await assert.rejects(askModel('p', { providers: [lixo] }));
+  assert.ok(breakerState().lixo, 'depois de 3+ falhas seguidas de formato, entra em espera');
+});
