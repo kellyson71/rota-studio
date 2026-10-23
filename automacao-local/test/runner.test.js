@@ -91,3 +91,13 @@ test('splitParts: sem parágrafo = 1 mensagem; limite de 3', () => {
   assert.equal(splitParts('a\n\nb\n\nc\n\nd\n\ne').length, 3); assert.equal(splitParts('a\n\nb\n\nc\n\nd')[2], 'c\n\nd');
   assert.deepEqual(splitParts('  a \n \n\n  b  '), ['a', 'b']);
 });
+
+test('retorno do envio sem id: confirma pela conversa e não duplica a mensagem', async t => {
+  let sends = 0; const f = fixture(t, { send: async () => { sends++; return {}; }, confirm: async (_a, text) => `conferido-${text.length}` });
+  await f.runner.tick(); await f.runner.tick();
+  assert.equal(sends, 1); assert.equal(f.results[0].p_status, 'sent'); assert.match(f.results[0].p_remote_id, /^conferido-/);
+});
+test('sem id e sem como conferir, fica incerto (nunca falha silenciosamente)', async t => {
+  const f = fixture(t, { send: async () => ({}), confirm: async () => null }); await f.runner.tick();
+  assert.equal(f.results[0].p_status, 'uncertain');
+});

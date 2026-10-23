@@ -31,6 +31,7 @@ export class Journal {
   // delay > 0: espera crescente (modelo inacessível); sem delay: tenta de novo no próximo ciclo.
   agentFail(id, delay = 0) { this.db.prepare('UPDATE agent_tasks SET attempts=attempts+1, next_at=? WHERE id=?').run(delay ? Math.floor(Date.now() / 1000) + delay : 0, id); }
   agentPending() { return this.db.prepare('SELECT rowid, * FROM agent_tasks WHERE done=0 AND attempts<5').all(); }
+  agentSeen(id) { return Boolean(this.db.prepare('SELECT 1 FROM agent_tasks WHERE id=?').get(id)); }
   agentDone(id) { this.db.prepare('UPDATE agent_tasks SET done=1 WHERE id=?').run(id); }
   close() { this.db.close(); }
 }

@@ -82,3 +82,9 @@ test('mensagens seguidas do mesmo contato geram um único rascunho, sobre a últ
   assert.equal(f.calls.filter(c => c.name === 'wa_draft_create').length, 2);
   assert.equal(f.calls.find(c => c.name === 'wa_draft_create').args.p_inbound_id, 'm3');
 });
+
+test('agentSeen reconhece mensagens já enfileiradas, mesmo depois de processadas', t => {
+  const f = fixture(t, async () => ({ final: 'draft', text: 'x', why: 'x' }));
+  assert.equal(f.journal.agentSeen('in-1'), false); f.journal.agentEnqueue(task); f.journal.agentDone('in-1');
+  assert.equal(f.journal.agentSeen('in-1'), true);
+});

@@ -37,6 +37,16 @@ const adapter = {
       journal.reply({ p_id: message.id, p_phone: job.phone, p_body: message.body || `[${message.type}]`, p_received_at: new Date(message.t * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
     }
   },
+  confirm: async (address, text, startedAt, sent) => {
+    console.error('Envio sem id no retorno; conferindo na conversa. Formato:', JSON.stringify({ tipo: typeof sent, chaves: sent ? Object.keys(sent).slice(0, 12) : null, id: sent?.id ?? null }).slice(0, 300));
+    try {
+      return await client.pupPage.evaluate((id, text, since) => {
+        const chat = window.require('WAWebCollections').Chat.get(id);
+        const m = chat?.msgs.getModelsArray().filter(m => m.id.fromMe && m.body === text && m.t >= since).pop();
+        return m ? String(m.id.toString()) : null;
+      }, address, text, Math.floor(startedAt / 1000) - 5);
+    } catch { return null; }
+  },
   send: async (address, body) => {
     let timer;
     try {
@@ -84,6 +94,7 @@ async function catchUp() {
         const address = await adapter.resolve(phone);
         if (!address) continue;
         for (const m of await inboundSince(address, Date.now() / 1000 - 48 * 3600)) {
+          if (journal.agentSeen(m.id)) continue; // já foi registrada e enfileirada antes
           journal.reply({ p_id: m.id, p_phone: phone, p_body: m.body || `[${m.type}]`, p_received_at: new Date(m.t * 1000).toISOString(), p_optout: isOptOut(m.body || '') });
           journal.agentEnqueue({ id: m.id, phone, body: m.body || `[${m.type}]` });
         }

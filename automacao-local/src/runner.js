@@ -54,7 +54,10 @@ export class Runner {
         for (let i = 0; i < parts.length; i++) {
           if (i > 0) await this.pause();
           try {
-            const id = msgId((await this.whatsapp.send(address, parts[i]))?.id);
+            const startedAt = Date.now();
+            const sent = await this.whatsapp.send(address, parts[i]);
+            // Sem id no retorno da biblioteca, confere na conversa qual mensagem acabou de sair.
+            const id = msgId(sent?.id) || await this.whatsapp.confirm?.(address, parts[i], startedAt, sent);
             if (!id) throw new Error('WhatsApp não retornou confirmação');
             remoteId ??= id;
           } catch (error) {
