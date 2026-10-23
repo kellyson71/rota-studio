@@ -164,7 +164,7 @@
     if (!Number.isFinite(when.getTime()) || when <= new Date()) return showError(new Error('Escolha uma data e hora futura.'));
     const args = { p_id: requestId || crypto.randomUUID(), p_device_id: d.id, p_contact_id: c.id, p_phone: n, p_name: c.name, p_body: draft.body.trim(), p_scheduled_at: when.toISOString() };
     requestId = args.p_id;
-    modal(`<h2>Revisar antes de agendar</h2><p><strong>${esc(c.name)}</strong> · +${esc(n)}<br>${date(when)} · ${esc(d.name)}</p><div class="wa-review">${esc(args.p_body)}</div>${!alive(d) || d.status !== 'ready' ? '<p class="wa-note">O PC está desconectado. O envio só ocorrerá se ele estiver pronto até uma hora depois do horário agendado.</p>' : ''}<p id="wa-save-error" class="wa-error"></p><div class="form-actions"><button class="btn primary" id="wa-confirm" type="button">Confirmar agendamento</button></div>`);
+    modal(`<h2>Revisar antes de agendar</h2><p><strong>${esc(c.name)}</strong> · +${esc(n)}<br>${date(when)} · ${esc(d.name)}</p><div class="wa-review">${esc(args.p_body)}</div>${partsHint(args.p_body)}${!alive(d) || d.status !== 'ready' ? '<p class="wa-note">O PC está desconectado. O envio só ocorrerá se ele estiver pronto até uma hora depois do horário agendado.</p>' : ''}<p id="wa-save-error" class="wa-error"></p><div class="form-actions"><button class="btn primary" id="wa-confirm" type="button">Confirmar agendamento</button></div>`);
     document.querySelector('#wa-confirm').onclick = async event => {
       const button = event.currentTarget; button.disabled = true;
       try { await Store.waRpc('wa_schedule', args); document.querySelector('#modal').close(); draft = {}; requestId = null; document.querySelector('#wa-compose')?.reset(); const time = document.querySelector('#wa-time'); if (time) time.value = defaultDate(); toast('Mensagem agendada'); await refresh(); }
@@ -172,6 +172,8 @@
     };
   }
   const DAILY_FIRST_CONTACTS = 5;
+  const partsOf = body => { const p = String(body).split(/\n[ \t]*\n+/).map(x => x.trim()).filter(Boolean); return p.length > 3 ? 3 : p.length; };
+  const partsHint = body => partsOf(body) > 1 ? `<p class="hint">Cada parágrafo sai como uma mensagem (${partsOf(body)} no total), com pausa de alguns segundos entre elas.</p>` : '';
   const today = value => new Date(value).toLocaleDateString('en-CA', { timeZone: 'America/Fortaleza' });
   const canStart = c => Boolean(c && c.kind !== 'government' && c.status === 'A enviar' && phone(c.phone));
   // Iniciar direto: revisão em um passo e envio imediato pela fila do computador vinculado.
@@ -187,7 +189,7 @@
       if (already.length) return toast('Este contato já tem mensagem agendada ou enviada. Veja a aba WhatsApp.');
       const todayCount = data.messages.filter(m => ['queued', 'sending', 'sent', 'uncertain'].includes(m.status) && today(m.created_at) === today(Date.now())).length;
       const args = { p_id: crypto.randomUUID(), p_device_id: d.id, p_contact_id: c.id, p_phone: n, p_name: c.name, p_body: body, p_scheduled_at: new Date().toISOString() };
-      modal(`<h2>Iniciar conversa agora</h2><p><strong>${esc(c.name)}</strong> · +${esc(n)}<br>Sai em até 1 minuto, pelo ${esc(d.name)}.</p><div class="wa-review">${esc(body)}</div>${todayCount >= DAILY_FIRST_CONTACTS ? `<p class="wa-note">Hoje já são ${todayCount} envios na fila ou enviados (meta segura: ${DAILY_FIRST_CONTACTS} por dia). Considere deixar este para amanhã.</p>` : `<p class="hint">Hoje: ${todayCount} de ${DAILY_FIRST_CONTACTS} primeiros contatos.</p>`}<p id="wa-save-error" class="wa-error"></p><div class="form-actions"><button class="btn primary" id="wa-confirm" type="button">Enviar agora</button></div>`);
+      modal(`<h2>Iniciar conversa agora</h2><p><strong>${esc(c.name)}</strong> · +${esc(n)}<br>Sai em até 1 minuto, pelo ${esc(d.name)}.</p><div class="wa-review">${esc(body)}</div>${partsHint(body)}${todayCount >= DAILY_FIRST_CONTACTS ? `<p class="wa-note">Hoje já são ${todayCount} envios na fila ou enviados (meta segura: ${DAILY_FIRST_CONTACTS} por dia). Considere deixar este para amanhã.</p>` : `<p class="hint">Hoje: ${todayCount} de ${DAILY_FIRST_CONTACTS} primeiros contatos.</p>`}<p id="wa-save-error" class="wa-error"></p><div class="form-actions"><button class="btn primary" id="wa-confirm" type="button">Enviar agora</button></div>`);
       document.querySelector('#wa-confirm').onclick = async event => {
         const button = event.currentTarget; button.disabled = true;
         try { await Store.waRpc('wa_schedule', args); document.querySelector('#modal').close(); toast('Na fila: sai em até 1 minuto'); }
