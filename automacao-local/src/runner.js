@@ -1,7 +1,11 @@
 export const phoneKey = value => value.startsWith('55') && value.length === 13 && value[4] === '9' ? value.slice(0,4) + value.slice(5) : value;
 export function isOptOut(text) {
   const s = text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/[.!?]+$/g, '');
-  return /^(pare|parar|sair|stop|remover|cancelar|nao tenho interesse|sem interesse|nao me envie mais mensagens|nao quero receber mensagens|nao quero mais mensagens)$/.test(s);
+  return /^(pare|parar|sair|stop|remover|cancelar|nao tenho interesse|sem interesse|nao me envie mais mensagens|nao quero receber mensagens|nao quero mais mensagens)$/.test(s)
+    || /\b(pare|para|parem|parar) de (me )?(mandar|enviar|chamar|escrever|incomodar)\b/.test(s)
+    || /\bnao (me )?(mande|envie|chame|escreva|procure|incomode|perturbe)\b.*\b(mais|mensagem|mensagens|contato)\b/.test(s)
+    || /\b(tire|tira|remova|exclua|apague)\b.*\b(numero|contato|lista|cadastro)\b/.test(s)
+    || /\bnao (quero|tenho interesse|preciso)\b.*\b(receber|mensagens?|contato)\b/.test(s);
 }
 
 export class Runner {
