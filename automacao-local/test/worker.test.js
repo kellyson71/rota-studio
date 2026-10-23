@@ -96,3 +96,11 @@ test('reagenda para quando o disjuntor libera o primeiro provedor', async t => {
   const row = f.journal.db.prepare('SELECT next_at FROM agent_tasks WHERE id=?').get('in-1');
   assert.ok(row.next_at - before >= 41 && row.next_at - before <= 43, `next_at em ~42s (foi ${row.next_at - before}s)`);
 });
+
+test('diário: comando é tratado uma vez só, aviso sai uma vez e lembrete guarda o horário', t => {
+  const f = fixture(t, async () => ({ final: 'draft', text: 'x', why: 'x' }));
+  assert.equal(f.journal.commandFirst('cmd-1'), true); assert.equal(f.journal.commandFirst('cmd-1'), false, 'tempo real + varredura não decidem duas vezes');
+  f.journal.noticeEnqueue('draft:1', 'aviso'); f.journal.noticeEnqueue('draft:1', 'aviso repetido');
+  assert.equal(f.journal.noticesPending().length, 1); f.journal.noticeSent('draft:1'); assert.equal(f.journal.noticesPending().length, 0);
+  assert.equal(f.journal.reminderLast('d1'), null); f.journal.reminderSet('d1', 1000); f.journal.reminderSet('d1', 2000); assert.equal(f.journal.reminderLast('d1'), 2000);
+});

@@ -10,6 +10,7 @@ import { Journal } from './journal.js';
 import { Runner, isOptOut, phoneKey, msgId } from './runner.js';
 import { AgentWorker } from './agent/worker.js';
 import { configureHealth, providerHealth } from './agent/llm.js';
+import { formatNotice, parseCommand } from './agent/notify.js';
 import { execFile } from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,6 +23,10 @@ if (!fs.existsSync(localSecretPath)) fs.writeFileSync(localSecretPath, randomByt
 const localSecret = fs.readFileSync(localSecretPath, 'utf8').trim();
 // Saúde dos provedores do agente persiste entre reinícios: quem está sem login ou em limite segue em espera.
 configureHealth({ file: path.join(dataDir, 'llm-health.json') });
+// Número do dono: recebe os rascunhos para aprovar e é o único que pode mandar comandos (data/agent.json).
+const agentConfig = (() => { try { return JSON.parse(fs.readFileSync(path.join(dataDir, 'agent.json'), 'utf8')); } catch { return {}; } })();
+const ownerPhone = String(agentConfig.ownerPhone || '').replace(/\D/g, '');
+const isOwner = phone => Boolean(ownerPhone) && phoneKey(phone) === phoneKey(ownerPhone);
 let journal;
 let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : null;
 let cloud, runner, client, starting = false, stopping = false, qr = null, status = 'offline', lastError = null, cloudError = null;
@@ -73,7 +78,10 @@ function setupCloud() {
     global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(20000) }) }
   });
   runner = new Runner({ rpc, journal, whatsapp: adapter });
-  worker = new AgentWorker({ rpc, journal, kb, notify: ({ name, body, decision }) => execFile('notify-send', ['-a', 'Indexa', `Rascunho do agente: ${name || 'contato'}`, `${body.slice(0, 120)}\n→ ${decision.why}`], () => {}) });
+  worker = new AgentWorker({ rpc, journal, kb, notify: draft => {
+    execFile('notify-send', ['-a', 'Indexa', `Rascunho do agente: ${draft.name || 'contato'}`, `${draft.body.slice(0, 120)}\n→ ${draft.decision.why}`], () => {});
+    if (ownerPhone) { journal.noticeEnqueue(`draft:${draft.id}`, formatNotice(draft)); journal.reminderSet(draft.id, Date.now()); }
+  } });
 }
 // Lê o modelo da conversa direto: WWebJS.getChat quebra ao serializar conversas com identificador @lid.
 async function inboundSince(address, since) {
@@ -90,15 +98,18 @@ async function inboundSince(address, since) {
 }
 // Rede de segurança: mensagens que chegaram com o PC desligado, reiniciando ou antes de o WhatsApp ficar pronto.
 async function catchUp() {
-  if (catching || status !== 'ready' || !watchedPhones.length) return;
+  if (catching || status !== 'ready' || (!watchedPhones.length && !ownerPhone)) return;
   catching = true;
   try {
-    for (const phone of watchedPhones) {
+    for (const phone of new Set([...watchedPhones, ...(ownerPhone ? [ownerPhone] : [])])) {
       try {
         if (!addressOf.has(phone)) addressOf.set(phone, await adapter.resolve(phone));
         const address = addressOf.get(phone);
         if (!address) continue;
         for (const m of await inboundSince(address, Date.now() / 1000 - 48 * 3600)) {
+          const command = isOwner(phone) && parseCommand(m.body);
+          if (command) { await runCommand(m.id, command); continue; }
+          if (!watched.has(phoneKey(phone))) continue;
           if (journal.agentSeen(m.id)) continue; // já foi registrada e enfileirada antes
           journal.reply({ p_id: m.id, p_phone: phone, p_body: m.body || `[${m.type}]`, p_received_at: new Date(m.t * 1000).toISOString(), p_optout: isOptOut(m.body || '') });
           journal.agentEnqueue({ id: m.id, phone, body: m.body || `[${m.type}]` });
@@ -106,6 +117,39 @@ async function catchUp() {
       } catch (error) { lastError = `Varredura: ${error.message}`.slice(0, 200); }
     }
   } finally { catching = false; }
+}
+// Aprovação pelo WhatsApp: decide no banco e responde ao dono na mesma conversa.
+async function runCommand(id, command) {
+  if (!cloud || !journal.commandFirst(id)) return;
+  let reply;
+  try {
+    const result = await rpc('wa_draft_decide_device', { p_code: command.code, p_action: command.action, p_text: command.text || null });
+    reply = result.status === 'approved' ? `✅ ${command.code} aprovado${command.text ? ' com o seu texto' : ''}: sai em até 1 minuto para ${result.name}.` : `🗑️ ${command.code} descartado.`;
+  } catch (error) { reply = `⚠️ ${error.message}`; }
+  journal.noticeEnqueue(`reply:${id}`, reply);
+}
+async function sendNotices() {
+  if (!ownerPhone || status !== 'ready') return;
+  const pending = journal.noticesPending();
+  if (!pending.length) return;
+  if (!addressOf.has(ownerPhone)) addressOf.set(ownerPhone, await adapter.resolve(ownerPhone));
+  const address = addressOf.get(ownerPhone);
+  if (!address) { lastError = 'Número do dono não encontrado no WhatsApp'; return; }
+  for (const n of pending) {
+    try { await client.sendMessage(address, n.body, { sendSeen: false }); journal.noticeSent(n.id); }
+    catch (error) { journal.noticeFail(n.id); lastError = `Aviso ao dono: ${error.message}`.slice(0, 200); }
+  }
+}
+// Rascunho parado há 2 h: lembra o dono, só de segunda a sexta entre 9h e 22h.
+const ownerAwake = (d = new Date()) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Fortaleza', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(d).map(x => [x.type, x.value])); return !['Sat', 'Sun'].includes(p.weekday) && +p.hour >= 9 && +p.hour < 22; };
+async function remind() {
+  if (!ownerPhone || !cloud || !ownerAwake()) return;
+  for (const draft of await rpc('wa_drafts_pending')) {
+    const last = journal.reminderLast(draft.id) ?? new Date(draft.created_at).getTime();
+    if (Date.now() - last < 2 * 3600 * 1000) continue;
+    journal.noticeEnqueue(`remind:${draft.id}:${Date.now()}`, formatNotice(draft, { reminder: true }));
+    journal.reminderSet(draft.id, Date.now());
+  }
 }
 async function heartbeat() {
   if (!cloud) return;
@@ -140,10 +184,13 @@ async function connect() {
           const pairs = await client.getContactLidAndPhone([message.from]);
           phone = pairs?.[0]?.pn?.split('@')[0] || '';
         }
-        if (!/^[1-9]\d{9,14}$/.test(phone) || !watched.has(phoneKey(phone))) return;
+        if (!/^[1-9]\d{9,14}$/.test(phone)) return;
         const body = message.body || `[${message.type}]`;
         const mid = msgId(message.id);
         if (!mid) { lastError = 'Resposta recebida sem identificador; não foi registrada'; return; }
+        const command = isOwner(phone) && parseCommand(message.body);
+        if (command) return void runCommand(mid, command);
+        if (!watched.has(phoneKey(phone))) return;
         journal.reply({ p_id: mid, p_phone: phone, p_body: body, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
         journal.agentEnqueue({ id: mid, phone, body });
       } catch (error) { lastError = `Falha ao registrar resposta: ${error.message}`; }
@@ -168,7 +215,7 @@ app.use('/api', (req, res, next) => {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return res.status(401).json({ error: 'Abra o endereço com a chave local, conforme o arquivo de acesso.' });
   next();
 });
-app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth() }));
+app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone) }));
 app.post('/api/config', async (req, res) => {
   if (config) return res.status(409).json({ error: 'Este executor já está vinculado. Para trocar, pare o serviço e remova data/connection.json.' });
   const { supabaseUrl, supabaseKey, token } = req.body;
@@ -203,6 +250,8 @@ const agentTimer = setInterval(async () => {
   if (!worker || stopping) return;
   try { await worker.tick(); } catch (error) { cloudError = `Agente: ${error.message}`.slice(0, 300); }
 }, 5000);
+const noticeTimer = setInterval(() => { if (!stopping) void sendNotices().catch(() => {}); }, 5000);
+const remindTimer = setInterval(() => { if (!stopping) void remind().catch(() => {}); }, 10 * 60000);
 // Rede de segurança rápida: leitura local das conversas monitoradas, sem consultar o WhatsApp.
 const catchUpTimer = setInterval(() => { if (!stopping) void catchUp(); }, 20000);
 // Vigia: a biblioteca às vezes não emite "ready" mesmo com o WhatsApp Web totalmente carregado.
@@ -223,7 +272,7 @@ const reconnectTimer = setInterval(async () => {
 async function shutdown() {
   if (stopping) return;
   stopping = true;
-  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(catchUpTimer); clearInterval(reconnectTimer);
+  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(catchUpTimer); clearInterval(noticeTimer); clearInterval(remindTimer); clearInterval(reconnectTimer);
   server.close();
   const kill = setTimeout(() => process.exit(0), 12000);
   status = 'offline'; qr = null;

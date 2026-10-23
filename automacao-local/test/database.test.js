@@ -20,6 +20,7 @@ test('migração e regras da fila em PostgreSQL 16', async t => {
   sql(readFileSync(new URL('../../supabase/migrations/20261023_whatsapp.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/20261024_agente.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/20261025_rascunhos.sql',import.meta.url),'utf8'));
+  sql(readFileSync(new URL('../../supabase/migrations/20261026_aprovacao_whatsapp.sql',import.meta.url),'utf8'));
   const member = query => sql(`set role authenticated; set request.jwt.claims='{"email":"kellyson@rota-studio.app","sub":"11111111-1111-4111-8111-111111111111"}'; ${query}`);
   const anon = query => sql('set role anon; ' + query);
   const quote = value => "'" + String(value).replaceAll("'","''") + "'";
@@ -127,5 +128,27 @@ test('migração e regras da fila em PostgreSQL 16', async t => {
     anon(`select wa_draft_create('${d.token}','sub-2','5584999991111','olá?','repetida','{}'::jsonb);`);
     assert.equal(sql(`select status from wa_drafts where id='${b}';`),'pending','reenvio do mesmo id não derruba o atual');
     assert.throws(()=>member(`select wa_draft_decide('${a}','approve','x');`),'substituído não pode ser aprovado');
+  });
+  await t.test('aprovação pelo WhatsApp: código curto, edição, descarte, erros claros e só o próprio computador', () => {
+    sql("update contacts set status='A enviar' where id='fixture-clinic';");
+    const d=create();ready(d);schedule(d,{body:'Abertura aprovação'});
+    const mk=(id,sug)=>anon(`select wa_draft_create('${d.token}','${id}','5584999991111','msg ${id}','${sug}','{}'::jsonb);`);
+    const a=mk('ap-1','Sugestão A'); const code=a.replace(/-/g,'').slice(0,4);
+    const pend=JSON.parse(anon(`select wa_drafts_pending('${d.token}');`));
+    assert.equal(pend.length,1); assert.equal(pend[0].code,code.toUpperCase()); assert.equal(pend[0].suggestion,'Sugestão A');
+    const other=create(); assert.throws(()=>anon(`select wa_draft_decide_device('${other.token}','${code}','approve');`),'outro computador não decide');
+    assert.throws(()=>anon(`select wa_draft_decide_device('${d.token}','zz!','approve');`));
+    const r=JSON.parse(anon(`select wa_draft_decide_device('${d.token}','${code.toUpperCase()}','approve','Texto editado por mim');`));
+    assert.equal(r.status,'approved');
+    assert.equal(sql("select status from wa_messages where body='Texto editado por mim';"),'queued');
+    assert.equal(sql(`select decision->>'via' from wa_drafts where id='${a}';`),'whatsapp');
+    assert.throws(()=>anon(`select wa_draft_decide_device('${d.token}','${code}','approve');`),/já foi aprovado/);
+    const b=mk('ap-2','Sugestão B'); const cb=b.replace(/-/g,'').slice(0,4);
+    anon(`select wa_draft_decide_device('${d.token}','${cb}','reject');`);
+    assert.equal(sql(`select status from wa_drafts where id='${b}';`),'rejected');
+    const c=mk('ap-3',''); const cc=c.replace(/-/g,'').slice(0,4);
+    assert.throws(()=>anon(`select wa_draft_decide_device('${d.token}','${cc}','approve');`),/não tem sugestão/);
+    assert.throws(()=>anon(`select wa_draft_decide_device('${d.token}','ffff','approve');`));
+    assert.throws(()=>member(`select wa_drafts_pending('${d.token}');`),'membro logado não usa a função do executor');
   });
 });

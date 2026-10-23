@@ -24,7 +24,7 @@ export class AgentWorker {
       const decision = { final: result.final, why: result.why, rule: result.rule || null, intencao: result.intencao || null, urgencia: result.urgencia ?? null, temperatura: result.temperatura || null, model: result.model || null, issues: result.issues || [], block: Boolean(result.block), complaint: Boolean(result.complaint) };
       const id = await this.rpc('wa_draft_create', { p_inbound_id: task.id, p_phone: task.phone, p_inbound_body: task.body, p_suggestion: result.text || '', p_decision: decision });
       this.journal.agentDone(row.id);
-      if (id) this.notify({ phone: task.phone, name: ctx.contact?.name, body: task.body, decision });
+      if (id) this.notify({ id, phone: task.phone, name: ctx.contact?.name, body: task.body, suggestion: result.text || '', decision });
       return true;
     } catch (error) { this.journal.agentFail(row.id); throw error; }
     finally { this.busy = false; }
