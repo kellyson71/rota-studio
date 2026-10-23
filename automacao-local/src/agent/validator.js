@@ -14,7 +14,7 @@ export function validate(decision, { kb, lastSent = '', contactPrice = '' }) {
   const text = String(decision.resposta || '');
   const n = norm(text);
   if (!text.trim()) return [...issues, 'resposta vazia'];
-  if (text.length > 600) issues.push('resposta longa demais');
+  if (text.length > 400) issues.push('resposta longa demais');
   for (const url of n.match(/(https?:\/\/|www\.)\S+|\b[a-z0-9-]+\.(com|br|app|io|me|net)\b\S*/g) || []) {
     if (!kb.site || !norm(url).includes(norm(kb.site))) issues.push(`link não autorizado: ${url}`);
   }

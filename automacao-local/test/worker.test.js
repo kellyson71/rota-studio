@@ -55,7 +55,7 @@ test('tarefas sobrevivem a um reinício do executor', t => {
 test('modelo inacessível: espera crescente e, no fim, rascunho vazio para resposta manual', async t => {
   const f = fixture(t, async () => ({ final: 'draft', unavailable: true, text: '', why: 'agente indisponível: sem rede' }));
   f.journal.agentEnqueue(task);
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     await f.worker.tick();
     assert.equal(f.calls.filter(c => c.name === 'wa_draft_create').length, 0, 'ainda tentando');
     assert.equal(f.journal.agentNext(), undefined, 'aguardando a espera terminar');
@@ -87,4 +87,12 @@ test('agentSeen reconhece mensagens já enfileiradas, mesmo depois de processada
   const f = fixture(t, async () => ({ final: 'draft', text: 'x', why: 'x' }));
   assert.equal(f.journal.agentSeen('in-1'), false); f.journal.agentEnqueue(task); f.journal.agentDone('in-1');
   assert.equal(f.journal.agentSeen('in-1'), true);
+});
+
+test('reagenda para quando o disjuntor libera o primeiro provedor', async t => {
+  const f = fixture(t, async () => ({ final: 'draft', unavailable: true, retryInMs: 42000, text: '', why: 'agente indisponível: todos em espera' }));
+  f.journal.agentEnqueue(task); const before = Math.floor(Date.now() / 1000);
+  await f.worker.tick();
+  const row = f.journal.db.prepare('SELECT next_at FROM agent_tasks WHERE id=?').get('in-1');
+  assert.ok(row.next_at - before >= 41 && row.next_at - before <= 43, `next_at em ~42s (foi ${row.next_at - before}s)`);
 });

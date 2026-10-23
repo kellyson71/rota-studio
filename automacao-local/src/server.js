@@ -9,6 +9,7 @@ import QRCode from 'qrcode';
 import { Journal } from './journal.js';
 import { Runner, isOptOut, phoneKey, msgId } from './runner.js';
 import { AgentWorker } from './agent/worker.js';
+import { configureHealth, providerHealth } from './agent/llm.js';
 import { execFile } from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,10 +20,13 @@ const configPath = path.join(dataDir, 'connection.json');
 const localSecretPath = path.join(dataDir, 'local-key');
 if (!fs.existsSync(localSecretPath)) fs.writeFileSync(localSecretPath, randomBytes(24).toString('hex'), { mode: 0o600 });
 const localSecret = fs.readFileSync(localSecretPath, 'utf8').trim();
+// Saúde dos provedores do agente persiste entre reinícios: quem está sem login ou em limite segue em espera.
+configureHealth({ file: path.join(dataDir, 'llm-health.json') });
 let journal;
 let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : null;
 let cloud, runner, client, starting = false, stopping = false, qr = null, status = 'offline', lastError = null, cloudError = null;
 let watched = new Set(), watchedPhones = [], worker, catching = false, authSince = 0;
+const addressOf = new Map(); // telefone → id da conversa no WhatsApp (resolvido uma vez)
 const kb = JSON.parse(fs.readFileSync(new URL('./agent/kb.json', import.meta.url), 'utf8'));
 const adapter = {
   get ready() { return status === 'ready'; },
@@ -91,7 +95,8 @@ async function catchUp() {
   try {
     for (const phone of watchedPhones) {
       try {
-        const address = await adapter.resolve(phone);
+        if (!addressOf.has(phone)) addressOf.set(phone, await adapter.resolve(phone));
+        const address = addressOf.get(phone);
         if (!address) continue;
         for (const m of await inboundSince(address, Date.now() / 1000 - 48 * 3600)) {
           if (journal.agentSeen(m.id)) continue; // já foi registrada e enfileirada antes
@@ -163,7 +168,7 @@ app.use('/api', (req, res, next) => {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return res.status(401).json({ error: 'Abra o endereço com a chave local, conforme o arquivo de acesso.' });
   next();
 });
-app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError }));
+app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth() }));
 app.post('/api/config', async (req, res) => {
   if (config) return res.status(409).json({ error: 'Este executor já está vinculado. Para trocar, pare o serviço e remova data/connection.json.' });
   const { supabaseUrl, supabaseKey, token } = req.body;
@@ -198,7 +203,8 @@ const agentTimer = setInterval(async () => {
   if (!worker || stopping) return;
   try { await worker.tick(); } catch (error) { cloudError = `Agente: ${error.message}`.slice(0, 300); }
 }, 5000);
-const catchUpTimer = setInterval(() => { if (!stopping) void catchUp(); }, 180000);
+// Rede de segurança rápida: leitura local das conversas monitoradas, sem consultar o WhatsApp.
+const catchUpTimer = setInterval(() => { if (!stopping) void catchUp(); }, 20000);
 // Vigia: a biblioteca às vezes não emite "ready" mesmo com o WhatsApp Web totalmente carregado.
 // Com a página saudável, libera o estado pronto; sem isso, recria a conexão. A varredura cobre o tempo real.
 async function pageHealthy() {

@@ -19,6 +19,7 @@ test('migração e regras da fila em PostgreSQL 16', async t => {
   sql(readFileSync(new URL('../../supabase/schema.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/20261023_whatsapp.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/20261024_agente.sql',import.meta.url),'utf8'));
+  sql(readFileSync(new URL('../../supabase/migrations/20261025_rascunhos.sql',import.meta.url),'utf8'));
   const member = query => sql(`set role authenticated; set request.jwt.claims='{"email":"kellyson@rota-studio.app","sub":"11111111-1111-4111-8111-111111111111"}'; ${query}`);
   const anon = query => sql('set role anon; ' + query);
   const quote = value => "'" + String(value).replaceAll("'","''") + "'";
@@ -116,5 +117,15 @@ test('migração e regras da fila em PostgreSQL 16', async t => {
     assert.equal(sql(`select status from wa_drafts where id='${second}';`),'rejected');
     assert.equal(sql("select count(*) from wa_messages where body='Em torno de 3 semanas.';"),'0');
     assert.throws(()=>anon("select * from wa_drafts;"));
+  });
+  await t.test('rascunho novo do mesmo contato substitui o anterior pendente; repetido não substitui', () => {
+    const d=create();ready(d);schedule(d,{body:'Abertura substituição'});
+    const a=anon(`select wa_draft_create('${d.token}','sub-1','5584999991111','oi','primeira','{}'::jsonb);`);
+    const b=anon(`select wa_draft_create('${d.token}','sub-2','5584999991111','olá?','segunda','{}'::jsonb);`);
+    assert.equal(sql(`select status from wa_drafts where id='${a}';`),'superseded');
+    assert.equal(sql(`select status from wa_drafts where id='${b}';`),'pending');
+    anon(`select wa_draft_create('${d.token}','sub-2','5584999991111','olá?','repetida','{}'::jsonb);`);
+    assert.equal(sql(`select status from wa_drafts where id='${b}';`),'pending','reenvio do mesmo id não derruba o atual');
+    assert.throws(()=>member(`select wa_draft_decide('${a}','approve','x');`),'substituído não pode ser aprovado');
   });
 });

@@ -18,8 +18,8 @@ export class AgentWorker {
       const history = (ctx.history || []).filter(h => h.texto !== task.body || h.de !== 'cliente');
       const lastSent = [...history].reverse().find(h => h.de === 'eu')?.texto || '';
       const result = await this.handle({ message: task.body, history, kb: this.kb, contact: ctx.contact || {}, blocked: ctx.blocked, mode: 'shadow', lastSent });
-      // Modelo inacessível (rede bloqueada, serviço fora): espera 1, 3 e 10 min antes de desistir e deixar o rascunho vazio.
-      if (result.unavailable && row.attempts < 3) { this.journal.agentFail(row.id, [60, 180, 600][row.attempts]); return true; }
+            // Reagenda para quando o primeiro provedor sair da espera (entre 15 s e 10 min); só na 5ª vez desiste e deixa vazio.
+      if (result.unavailable && row.attempts < 4) { this.journal.agentFail(row.id, Math.max(15, Math.min(600, Math.round((result.retryInMs ?? [60, 180, 600, 600][row.attempts] * 1000) / 1000)))); return true; }
       if (result.final === 'ignore') { this.journal.agentDone(row.id); return true; }
       const decision = { final: result.final, why: result.why, rule: result.rule || null, intencao: result.intencao || null, urgencia: result.urgencia ?? null, temperatura: result.temperatura || null, model: result.model || null, issues: result.issues || [], block: Boolean(result.block), complaint: Boolean(result.complaint) };
       const id = await this.rpc('wa_draft_create', { p_inbound_id: task.id, p_phone: task.phone, p_inbound_body: task.body, p_suggestion: result.text || '', p_decision: decision });

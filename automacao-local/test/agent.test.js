@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { route, inBusinessHours } from '../src/agent/rules.js';
 import { validate } from '../src/agent/validator.js';
-import { handleInbound } from '../src/agent/agent.js';
+import { handleInbound, stageOf, buildPrompt } from '../src/agent/agent.js';
 import { extractJson } from '../src/agent/llm.js';
 
 const kb = { ...JSON.parse(readFileSync(new URL('../src/agent/kb.json', import.meta.url), 'utf8')), prazos: { site: [3, 7], sistema: [14, 28] } };
@@ -91,4 +91,13 @@ test('horário comercial em Fortaleza', () => {
   assert.equal(inBusinessHours(new Date('2026-10-24T13:00:00Z')), true);   // sáb 10h
   assert.equal(inBusinessHours(new Date('2026-10-24T16:00:00Z')), false);  // sáb 13h
   assert.equal(inBusinessHours(new Date('2026-10-25T14:00:00Z')), false);  // dom
+});
+
+test('etapa da conversa é decidida pelo código a partir do que o cliente disse', () => {
+  const eu = { de: 'eu', texto: 'Como vocês fazem hoje a confirmação dos pacientes?' };
+  assert.equal(stageOf([eu], 'estamos fazendo normal via whatzap'), 'descoberta');
+  assert.equal(stageOf([eu, { de: 'cliente', texto: 'via whatsapp' }], 'umas 4 faltas por semana, dá trabalho'), 'dor');
+  assert.equal(stageOf([eu], 'quanto custa?'), 'interesse');
+  assert.equal(stageOf([eu, { de: 'cliente', texto: 'pelo whatsapp' }, { de: 'cliente', texto: 'tá ok' }], 'funciona bem'), 'sem_dor');
+  assert.match(buildPrompt({ kb, history: [eu], message: 'via whatsapp' }), /ETAPA ATUAL[^\n]*DESCOBERTA[^\n]*NÃO ofereça/);
 });
