@@ -107,3 +107,12 @@ já tem o Chromium necessário.
 
 `whatsapp-web.js` depende de uma integração não oficial com o WhatsApp Web;
 mudanças do serviço podem exigir atualização ou nova autenticação.
+
+## Teste interativo pelo terminal
+
+Dentro de `automacao-local`, execute `npm run testar`. Escolha entre cliente no
+WhatsApp e aprovação no terminal, ou cliente no terminal e aprovação pelo
+WhatsApp do admin. O destino padrão é o número de admin configurado neste PC.
+Para escolher diretamente: `npm run testar -- --modo whatsapp --numero 5584999990000`.
+Use `/enviar TEXTO` para iniciar a abordagem pelo WhatsApp e `/sair` para encerrar.
+Veja os detalhes e os comandos em [OPERACAO.md](OPERACAO.md#laboratório-interativo).

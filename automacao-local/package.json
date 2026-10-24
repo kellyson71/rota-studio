@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.js",
     "test": "node --test test/*.test.js",
+    "testar": "node src/test-terminal.js",
     "simular": "node simulador/simulate.js"
   },
   "dependencies": {

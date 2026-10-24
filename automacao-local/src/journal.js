@@ -16,6 +16,7 @@ export class Journal {
       CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS internal_outputs(id TEXT PRIMARY KEY,phone TEXT NOT NULL,body TEXT NOT NULL,started_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS admin_events(id TEXT PRIMARY KEY,sender TEXT NOT NULL,command TEXT NOT NULL,response TEXT NOT NULL,created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS test_inputs(id TEXT PRIMARY KEY);
     `);
     // Banco criado antes da espera crescente: acrescenta a coluna uma única vez.
     if (!this.db.prepare('PRAGMA table_info(agent_tasks)').all().some(c => c.name === 'next_at')) this.db.exec('ALTER TABLE agent_tasks ADD COLUMN next_at INTEGER DEFAULT 0');
@@ -45,6 +46,8 @@ export class Journal {
   partsPending() { return this.db.prepare('SELECT * FROM parts WHERE remote_id IS NOT NULL AND synced=0 ORDER BY started_at,part_index').all(); }
   partSynced(id,index) { this.db.prepare('UPDATE parts SET synced=1 WHERE job_id=? AND part_index=?').run(id,index); }
   automationSeen(id) { if (id) this.db.prepare('INSERT OR IGNORE INTO automation_ids VALUES(?)').run(id); }
+  testInputSeen(id) {return Boolean(id&&this.db.prepare('SELECT 1 FROM test_inputs WHERE id=?').get(id));}
+  testInputRemember(id) {if(id)this.db.prepare('INSERT OR IGNORE INTO test_inputs VALUES(?)').run(id);}
   manualCaptureSince() { return Number(this.db.prepare("SELECT value FROM meta WHERE key='manualCaptureSince'").get().value); }
   internalStart(id,phone,body) { this.db.prepare('INSERT INTO internal_outputs VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET started_at=excluded.started_at').run(id,phone,body,Date.now()); }
   isAutomation(id,phone,body,at=Date.now()) {

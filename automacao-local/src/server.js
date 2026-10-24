@@ -16,6 +16,7 @@ import { normalizePhone, samePhone, phoneVariants, adminMessageAllowed, Supervis
 import { validateText } from './agent/validator.js';
 import { POLICY_VERSION, calculateQuote, renderQuote,COMMERCIAL_REPLIES } from './agent/commercial.js';
 import { FollowupWorker } from './followups.js';
+import { TestSession,routeTestInput } from './test-session.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = process.env.INDEXA_DATA_DIR || path.join(root, 'data');
@@ -37,9 +38,16 @@ let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 
 let cloud, runner, client, starting = false, stopping = false, qr = null, status = 'offline', lastError = null, cloudError = null;
 let watched = new Set(), watchedPhones = [], worker, catching = false, authSince = 0;
 let supervisor,followups, adminChain=Promise.resolve(),noticesBusy=false;
+let testSession;
+let adminBusy=0;
+const testing=()=>Boolean(testSession&&(!testSession.closed||testSession.busy>0));
 const internalSendingBodies=new Set();
 const addressOf = new Map(); // telefone → id da conversa no WhatsApp (resolvido uma vez)
 const kb = JSON.parse(fs.readFileSync(new URL('./agent/kb.json', import.meta.url), 'utf8'));
+async function resolveWhatsApp(phone){
+  try { for(const candidate of phoneVariants(phone)){const id=(await client.getNumberId(candidate))?._serialized;if(id)return id;}return null; }
+  catch (error) { throw new Error(`Falha ao localizar o número (${error.message})`); }
+}
 function validateDelivery(text,decision={}) {
   let approvedText=COMMERCIAL_REPLIES.includes(text)?text:null;
   if(decision.quote){try{const quote=calculateQuote(decision.quote);const rendered=renderQuote(quote);if(rendered===text)approvedText=rendered;else return ['proposta difere do cálculo autorizado'];}catch(error){return [error.message];}}
@@ -49,8 +57,7 @@ const adapter = {
   get ready() { return status === 'ready'; },
   resolve: async phone => {
     watched.add(phoneKey(phone));
-    try { for(const candidate of phoneVariants(phone)){const id=(await client.getNumberId(candidate))?._serialized;if(id)return id;}return null; }
-    catch (error) { throw new Error(`Falha ao localizar o número (${error.message})`); }
+    return resolveWhatsApp(phone);
   },
   beforeSend: async (address, job) => {
     // Recupera respostas recebidas enquanto o PC estava desligado.
@@ -121,6 +128,7 @@ async function conversationSince(address, since) {
   } catch (error) { throw new Error(`Falha ao conferir respostas (${error.message})`); }
 }
 function captureManual(m,phone){
+  if(testing()&&samePhone(phone,testSession.phone))return;
   if(m.t*1000<journal.manualCaptureSince()||isOwner(phone)||journal.isAutomation(m.id,phone,m.body,m.t*1000))return;
   journal.manual({p_id:m.id,p_phone:phone,p_body:m.body||`[${m.type}]`,p_sent_at:new Date(m.t*1000).toISOString()});
 }
@@ -130,23 +138,48 @@ async function peerPhone(address){
   return normalizePhone(String(address||'').split('@')[0]);
 }
 function runAdmin(id,phone,body){
+  if(testing())return;
   if(!cloud||!supervisor||!isOwner(phone)||!journal.commandFirst(id))return;
+  adminBusy++;
   adminChain=adminChain.then(async()=>{
     let reply;try{reply=await supervisor.handle(phone,body);}catch(error){reply=`Não executei: ${error.message}`;}
     if(reply){journal.adminEvent(id,phone,body,reply);journal.noticeEnqueue(`admin:${id}`,reply);}
-  }).catch(error=>{lastError=`Supervisor: ${error.message}`.slice(0,200);});
+  }).catch(error=>{lastError=`Supervisor: ${error.message}`.slice(0,200);}).finally(()=>{adminBusy--;});
+}
+function routeTestMessage(phone,m){
+  if(journal?.testInputSeen(m.id))return true;
+  if(!testing())return false;
+  const account=normalizePhone(client.info?.wid?.user||client.info?.wid?._serialized?.split('@')[0]);
+  return routeTestInput(testSession,phone,m,{account,isAutomation:internalSendingBodies.has(m.body)||journal.isAutomation(m.id,phone,m.body,m.t*1000),onConsumed:id=>journal.testInputRemember(id)});
+}
+async function sendTestWhatsApp(phone,text,guard){
+  if(status!=='ready')throw new Error('WhatsApp desconectado.');
+  const address=await resolveWhatsApp(phone);
+  if(!address)throw new Error('Número não encontrado no WhatsApp.');
+  addressOf.set(phone,address);
+  if(!guard())throw new Error('Teste encerrado ou contexto alterado.');
+  const noticeId=`test:${randomBytes(16).toString('hex')}`;
+  journal.internalStart(noticeId,phone,text);internalSendingBodies.add(text);
+  try{
+    const startedAt=Date.now(),sent=await adapter.send(address,text);
+    const id=msgId(sent?.id)||await adapter.confirm(address,text,startedAt,sent);
+    if(!id)throw new Error('WhatsApp não confirmou o envio. Confira a conversa.');
+    journal.automationSeen(id);
+  }finally{setTimeout(()=>internalSendingBodies.delete(text),15000);}
 }
 // Rede de segurança: mensagens que chegaram com o PC desligado, reiniciando ou antes de o WhatsApp ficar pronto.
 async function catchUp() {
   if (catching || status !== 'ready' || (!watchedPhones.length && !ownerPhone)) return;
   catching = true;
   try {
-    for (const phone of new Set([...watchedPhones, ...(ownerPhone ? [ownerPhone] : [])])) {
+    const phones=testing()?[testSession.mode==='whatsapp'?testSession.phone:ownerPhone]:[...watchedPhones,...(ownerPhone?[ownerPhone]:[])];
+    for (const phone of new Set(phones)) {
       try {
-        if (!addressOf.has(phone)) addressOf.set(phone, await adapter.resolve(phone));
+        if (!addressOf.has(phone)) addressOf.set(phone, await (testing()?resolveWhatsApp(phone):adapter.resolve(phone)));
         const address = addressOf.get(phone);
         if (!address) continue;
         for (const m of await conversationSince(address, Date.now() / 1000 - 48 * 3600)) {
+          if(routeTestMessage(phone,m))continue;
           if(isOwner(phone)){
             const account=normalizePhone(client.info?.wid?.user||client.info?.wid?._serialized?.split('@')[0]);
             if(!adminMessageAllowed(phone,account,m.fromMe,ownerPhone))continue;
@@ -165,7 +198,7 @@ async function catchUp() {
 }
 // Aprovação pelo WhatsApp: decide no banco e responde ao dono na mesma conversa.
 async function sendNotices() {
-  if (!ownerPhone || status !== 'ready'||noticesBusy) return;
+  if (testing()||!ownerPhone || status !== 'ready'||noticesBusy) return;
   noticesBusy=true;
   try{
   const pending = journal.noticesPending();
@@ -186,7 +219,7 @@ async function sendNotices() {
 // Rascunho parado há 2 h: lembra o dono, só de segunda a sexta entre 9h e 22h.
 const ownerAwake = (d = new Date()) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Fortaleza', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(d).map(x => [x.type, x.value])); return !['Sat', 'Sun'].includes(p.weekday) && +p.hour >= 9 && +p.hour < 22; };
 async function remind() {
-  if (!ownerPhone || !cloud || !ownerAwake()) return;
+  if (testing()||!ownerPhone || !cloud || !ownerAwake()) return;
   for (const draft of await rpc('wa_drafts_pending')) {
     const last = journal.reminderLast(draft.id) ?? new Date(draft.created_at).getTime();
     if (Date.now() - last < 2 * 3600 * 1000) continue;
@@ -232,6 +265,7 @@ async function connect() {
         const body = message.body || `[${message.type}]`;
         const mid = msgId(message.id);
         if (!mid) { lastError = 'Resposta recebida sem identificador; não foi registrada'; return; }
+        if(routeTestMessage(phone,{id:mid,body,type:message.type,t:message.timestamp,fromMe:false}))return;
         if(isOwner(phone))return runAdmin(mid,phone,body);
         if (!watched.has(phoneKey(phone))) return;
         journal.reply({ p_id: mid, p_phone: phone, p_body: body, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
@@ -244,6 +278,7 @@ async function connect() {
         const mid=msgId(message.id);if(!mid||internalSendingBodies.has(message.body))return;
         const address=message.to;if(!address||/@(g\.us|broadcast|newsletter)$/.test(address))return;
         const phone=await peerPhone(address);if(!phone)return;
+        if(routeTestMessage(phone,{id:mid,body:message.body,type:message.type,t:message.timestamp,fromMe:true}))return;
         // Conversa consigo mesmo também serve como console, se o número conectado é o admin.
         const account=normalizePhone(client.info?.wid?.user||client.info?.wid?._serialized?.split('@')[0]);
         if(isOwner(phone)&&isOwner(account)) {if(!journal.isAutomation(mid,phone,message.body,message.timestamp*1000))runAdmin(mid,phone,message.body);return;}
@@ -271,7 +306,41 @@ app.use('/api', (req, res, next) => {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return res.status(401).json({ error: 'Abra o endereço com a chave local, conforme o arquivo de acesso.' });
   next();
 });
-app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone),adminPhone:ownerPhone||null, modoAgente:runtimeMode }));
+app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone),adminPhone:ownerPhone||null, modoAgente:runtimeMode,teste:testing()?testSession.snapshot():null }));
+app.get('/api/test',(_req,res)=>res.json({adminPhone:ownerPhone||null,status,session:testing()?testSession.snapshot():null}));
+app.post('/api/test/start',(req,res,next)=>{
+  try{
+    if(testing())return res.status(409).json({error:'Já existe um teste ativo. Encerre no terminal anterior ou aguarde a sessão expirar.'});
+    if(!journal||status!=='ready')return res.status(409).json({error:'Espere o WhatsApp ficar conectado antes de iniciar.'});
+    if(runner?.busy||worker?.busy||noticesBusy||followups?.busy||adminBusy)return res.status(409).json({error:'Há uma operação em andamento. Tente novamente em alguns segundos.'});
+    testSession=new TestSession({mode:req.body.mode,phone:req.body.phone,adminPhone:ownerPhone,kb,validate:validateDelivery,sendWhatsApp:sendTestWhatsApp,ask:askModel});
+    const dir=path.join(dataDir,'testes');fs.mkdirSync(dir,{recursive:true,mode:0o700});
+    const log=path.join(dir,`${testSession.id}.jsonl`);
+    fs.writeFileSync(log,testSession.events.map(e=>JSON.stringify(e)+'\n').join(''),{mode:0o600});
+    testSession.audit=event=>fs.appendFileSync(log,JSON.stringify(event)+'\n');
+    res.json(testSession.poll());
+  }catch(error){next(error);}
+});
+app.use('/api/test/:id',(req,res,next)=>{
+  if(!testSession||req.params.id!==testSession.id)return res.status(404).json({error:'Sessão de teste não encontrada.'});
+  next();
+});
+app.get('/api/test/:id/events',(req,res)=>res.json(testSession.poll(Number(req.query.after)||0)));
+app.post('/api/test/:id/input',(req,res,next)=>{
+  try{
+    if(req.body.kind==='client')testSession.client(req.body.text,{source:'terminal'});
+    else if(req.body.kind==='admin'){
+      if(testSession.approvalChannel!=='terminal')throw new Error('Neste modo as autorizações são dadas no WhatsApp do admin.');
+      void testSession.admin(req.body.text,{source:'terminal'});
+    }else if(req.body.kind==='opening'){
+      if(testSession.mode!=='whatsapp')throw new Error('A abertura pelo terminal é usada no modo cliente no WhatsApp.');
+      void testSession.opening(req.body.text);
+    }else throw new Error('Entrada inválida.');
+    res.json({ok:true});
+  }catch(error){next(error);}
+});
+app.post('/api/test/:id/stop',(_req,res)=>{testSession.close();res.json({ok:true});});
+app.use('/api/test',(error,_req,res,_next)=>res.status(400).json({error:error.message}));
 app.post('/api/config', async (req, res) => {
   if (config) return res.status(409).json({ error: 'Este executor já está vinculado. Para trocar, pare o serviço e remova data/connection.json.' });
   const { supabaseUrl, supabaseKey, token } = req.body;
@@ -299,18 +368,19 @@ const server = app.listen(port, '127.0.0.1', () => {
 });
 const heartbeatTimer = setInterval(() => void heartbeat(), 10000);
 const workTimer = setInterval(async () => {
-  if (!runner || stopping) return;
+  if (!runner || stopping||testing()) return;
   try { await runner.tick(); cloudError = null; } catch (error) { cloudError = error.message; }
 }, 5000);
 const agentTimer = setInterval(async () => {
-  if (!worker || stopping) return;
+  if (!worker || stopping||testing()) return;
   try { await worker.tick(); } catch (error) { cloudError = `Agente: ${error.message}`.slice(0, 300); }
 }, 5000);
 const noticeTimer = setInterval(() => { if (!stopping) void sendNotices().catch(() => {}); }, 5000);
 const remindTimer = setInterval(() => { if (!stopping) void remind().catch(() => {}); }, 10 * 60000);
 // Rede de segurança rápida: leitura local das conversas monitoradas, sem consultar o WhatsApp.
 const catchUpTimer = setInterval(() => { if (!stopping) void catchUp(); }, 20000);
-const followupTimer=setInterval(()=>{if(!stopping&&followups&&status==='ready')void followups.tick().catch(error=>{cloudError=`Retornos: ${error.message}`;});},60000);
+const followupTimer=setInterval(()=>{if(!testing()&&!stopping&&followups&&status==='ready')void followups.tick().catch(error=>{cloudError=`Retornos: ${error.message}`;});},60000);
+const testLeaseTimer=setInterval(()=>{if(testing()&&Date.now()-testSession.lastPoll>90000)testSession.close('Terminal desconectado há 90 segundos; teste encerrado.');},10000);
 // Vigia: a biblioteca às vezes não emite "ready" mesmo com o WhatsApp Web totalmente carregado.
 // Com a página saudável, libera o estado pronto; sem isso, recria a conexão. A varredura cobre o tempo real.
 async function pageHealthy() {
@@ -329,6 +399,8 @@ const reconnectTimer = setInterval(async () => {
 async function shutdown() {
   if (stopping) return;
   stopping = true;
+  if(testing())testSession.close('Executor encerrado.');
+  clearInterval(testLeaseTimer);
   clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(catchUpTimer); clearInterval(noticeTimer); clearInterval(remindTimer); clearInterval(reconnectTimer);clearInterval(followupTimer);
   server.close();
   const kill = setTimeout(() => process.exit(0), 12000);

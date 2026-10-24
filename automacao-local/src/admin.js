@@ -59,6 +59,7 @@ export class Supervisor {
           if(issues.length)return 'Não enviei: '+issues.join('; ');
         }
         const r=await this.rpc('wa_draft_decide_device',{p_code:command.code,p_action:command.action,p_text:command.text||null});
+        if(r.delivered)return `${command.code} aprovado e entregue no canal do teste.`;
         return r.status==='approved'?`${command.code} aprovado. Entrou na fila para ${r.name}; ainda depende da conexão e das conferências de envio.`:`${command.code} descartado.`;
       }
       default:{

@@ -19,7 +19,7 @@ async function refresh() {
     qr.hidden = !state.qr; if (state.qr) qr.src = state.qr; else qr.removeAttribute('src');
     document.querySelector('#reconnect').disabled = ['starting', 'ready', 'qr', 'authenticated'].includes(state.status);
     feedback.textContent = [state.error, state.cloudError].filter(Boolean).join(' · ');
-    document.querySelector('#admin-info').textContent = state.adminPhone ? `Administrador: +${state.adminPhone} · agente ${state.modoAgente === 'live' ? 'automático com limites' : 'em modo rascunho'}. Envie ajuda no WhatsApp do administrador.` : 'Administrador ainda não configurado; o agente fica em modo rascunho.';
+    document.querySelector('#admin-info').textContent = state.teste ? `Teste ativo: cliente no ${state.teste.mode === 'whatsapp' ? 'WhatsApp' : 'terminal'}; autorizações no ${state.teste.approvalChannel}. A automação normal está suspensa até encerrar o teste.` : state.adminPhone ? `Administrador: +${state.adminPhone} · agente ${state.modoAgente === 'live' ? 'automático com limites' : 'em modo rascunho'}. Envie ajuda no WhatsApp do administrador.` : 'Administrador ainda não configurado; o agente fica em modo rascunho.';
   } catch (error) { feedback.textContent = error.message; }
 }
 document.querySelector('#setup').onsubmit = async e => {

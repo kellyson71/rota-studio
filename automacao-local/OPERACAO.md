@@ -1,5 +1,73 @@
 # Operação do agente e do supervisor
 
+## Laboratório interativo
+
+Com o serviço local conectado ao WhatsApp:
+
+```sh
+cd /home/kellyson/Projetos/rota-studio/automacao-local
+npm run testar
+```
+
+O menu pede o modo e o telefone do cliente de teste. Enter usa o admin como
+destino. Para iniciar sem o menu, informe as duas opções:
+
+```sh
+npm run testar -- --modo whatsapp --numero 5584999990000
+npm run testar -- --modo terminal --numero 5584999990000
+```
+
+| Modo | Onde conversar como cliente | Onde autorizar |
+|---|---|---|
+| `whatsapp` | WhatsApp do telefone escolhido | Terminal |
+| `terminal` | Terminal, digitando mensagens normais | WhatsApp do admin |
+
+Os números dos exemplos são ilustrativos. Sem `--numero`, o destino é o admin
+configurado; não é necessário editar arquivos. No modo terminal, o número do
+cliente é apenas a identidade da simulação e não recebe mensagens reais.
+
+No modo WhatsApp, comece no terminal com, por exemplo:
+
+```text
+/enviar Oi! Sou o Kellyson, da Indexa. Como vocês fazem hoje a confirmação das consultas?
+```
+
+Depois, responda pelo WhatsApp como cliente. Se a conta conectada for a própria
+conta admin, use a conversa consigo mesmo. Mensagens enviadas pelo agente são
+identificadas para não voltarem como entrada. Durante esse modo, o texto que o
+admin escreve no WhatsApp é fala de cliente; não é uma autorização.
+
+O terminal acompanha mensagens, decisões, sugestões e códigos. No canal de
+autorização, use `ok CODIGO`, `não CODIGO`, `edita CODIGO TEXTO`, `pendências`,
+`status`, `orcar TELEFONE agenda normal | agendamento,recepcao`, ou
+`pausar TELEFONE` / `retomar TELEFONE`. No modo terminal, esses comandos devem
+ser enviados pelo WhatsApp do admin. A própria saída do modelo nunca aprova.
+
+`/ajuda` mostra os comandos do terminal; `/status` consulta a sessão; `/sair`,
+Ctrl+C ou o fechamento normal da entrada encerra. Perda de conexão do terminal
+encerra o teste em até 90 segundos sem acompanhamento. Só há uma sessão por PC.
+Reiniciar o serviço também encerra o teste. Operações de envio já em andamento
+precisam concluir ou expirar antes de liberar a automação normal.
+
+Durante a sessão, filas, respostas, retornos e avisos normais deste PC ficam
+suspensos. Não se altera a pausa salva no Supabase: ao sair, o estado anterior é
+respeitado. Os testes usam o mesmo agente, validador e catálogo, mas histórico,
+orçamentos e aprovações são locais, sem criar leads nem propostas no CRM.
+Entradas do WhatsApp consumidas pelo teste são lembradas no diário local para
+não serem reprocessadas como conversas reais após sair ou reiniciar.
+
+Horário comercial é ignorado apenas no laboratório. Validação de texto,
+limites comerciais, pausa por intervenção, expiração/invalidação de códigos e
+proteção contra repetição continuam valendo. Retornos de vários dias não são
+agendados no laboratório. O teste usa os provedores de modelo configurados no
+PC; indisponibilidade aparece como pedido de revisão. Sem confirmação de envio,
+a sessão pausa e o mesmo código não repete uma tentativa incerta.
+
+As mensagens enviadas pelo canal WhatsApp são reais. Autorizações de teste
+nesse canal vêm identificadas como `[TESTE ...]`. Registros ficam privados em
+`automacao-local/data/testes/SESSAO.jsonl`, com permissão de arquivo 600. Nada
+desse diretório é publicado no site nem versionado.
+
 ## Componentes
 
 - O painel Indexa autentica a equipe no Supabase. A primeira abordagem continua
