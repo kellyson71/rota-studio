@@ -7,7 +7,7 @@ import { TestSession, routeTestInput } from '../src/test-session.js';
 import { validateText } from '../src/agent/validator.js';
 import { handleInbound } from '../src/agent/agent.js';
 import { calculateQuote, renderQuote, COMMERCIAL_REPLIES } from '../src/agent/commercial.js';
-import { parseArgs } from '../src/test-terminal.js';
+import { parseArgs,openingFor,DEFAULT_OPENING } from '../src/test-terminal.js';
 import { Journal } from '../src/journal.js';
 
 const admin='558499990000',other='5584888882222';
@@ -103,6 +103,14 @@ test('polling renova sessão e comandos da CLI não aceitam opções ambíguas',
  assert.deepEqual(parseArgs(['--modo','terminal','--numero',admin]),{mode:'terminal',phone:admin});
  assert.throws(()=>parseArgs(['--modo','invalido']));assert.throws(()=>parseArgs(['--numero']));
  assert.throws(()=>fixture({mode:'errado'}));
+});
+test('abertura inicia modo WhatsApp e pode ser personalizada ou desativada',()=>{
+ assert.equal(openingFor(parseArgs(['--modo','whatsapp'])),DEFAULT_OPENING);
+ assert.equal(openingFor(parseArgs(['--modo','whatsapp','--abertura','Oi, tudo bem?'])),'Oi, tudo bem?');
+ assert.equal(openingFor(parseArgs(['--modo','whatsapp','--sem-abertura'])),null);
+ assert.equal(openingFor(parseArgs(['--modo','terminal'])),null);
+ assert.throws(()=>parseArgs(['--sem-abertura','--abertura','Oi']));
+ assert.throws(()=>parseArgs(['--modo','terminal','--abertura','Oi']));
 });
 test('entradas de teste são lembradas após reinício, sem consumir histórico anterior',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'indexa-test-inputs-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));

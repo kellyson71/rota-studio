@@ -26,7 +26,11 @@ Os números dos exemplos são ilustrativos. Sem `--numero`, o destino é o admin
 configurado; não é necessário editar arquivos. No modo terminal, o número do
 cliente é apenas a identidade da simulação e não recebe mensagens reais.
 
-No modo WhatsApp, comece no terminal com, por exemplo:
+No modo WhatsApp, a primeira abordagem é enviada automaticamente assim que
+o teste começa. Após a confirmação, o terminal indica que está aguardando sua
+resposta pelo WhatsApp. Para trocar a abertura, use `--abertura "TEXTO"`;
+`--sem-abertura` inicia aguardando o cliente, sem enviar uma mensagem inicial.
+Você também pode enviar uma abertura manual pelo terminal:
 
 ```text
 /enviar Oi! Sou o Kellyson, da Indexa. Como vocês fazem hoje a confirmação das consultas?

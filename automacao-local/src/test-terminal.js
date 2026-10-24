@@ -4,6 +4,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import readline from 'node:readline';
 import { createInterface } from 'node:readline/promises';
 
+export const DEFAULT_OPENING='Oi! Sou o Kellyson, da Indexa. Como vocês fazem hoje a confirmação das consultas?';
+export const openingFor=options=>options.mode==='whatsapp'&&!options.noOpening?(options.opening??DEFAULT_OPENING):null;
+
 const HELP = `Teste interativo Indexa
 
 npm run testar
@@ -13,6 +16,8 @@ npm run testar -- --modo terminal
 whatsapp: cliente conversa no WhatsApp; você autoriza neste terminal.
 terminal: você escreve como cliente aqui; autoriza no WhatsApp do admin.
 O número padrão é o admin. Cada execução começa uma conversa nova.
+No modo whatsapp, a primeira abordagem é enviada ao iniciar.
+Use --abertura "TEXTO" para trocar ou --sem-abertura para aguardar o cliente.
 
 /enviar TEXTO   envia uma abertura ao cliente no modo whatsapp
 /admin COMANDO  comando de autorização no modo whatsapp (ou escreva sem /admin)
@@ -32,11 +37,14 @@ export function parseArgs(args) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (['--help', '-h'].includes(arg)) { options.help = true; continue; }
+    if(arg==='--sem-abertura'){options.noOpening=true;continue;}
     const key = { '--modo': 'mode', '--numero': 'phone', '--abertura': 'opening' }[arg];
     if (!key || !args[i + 1] || args[i + 1].startsWith('--')) throw new Error(`Opção inválida ou sem valor: ${arg}`);
     options[key] = args[++i];
   }
   if (options.mode && !['whatsapp', 'terminal'].includes(options.mode)) throw new Error('--modo aceita whatsapp ou terminal.');
+  if(options.noOpening&&options.opening!==undefined)throw new Error('Use --abertura ou --sem-abertura, escolha apenas uma opção.');
+  if(options.mode==='terminal'&&options.opening!==undefined)throw new Error('--abertura é usada no modo whatsapp.');
   return options;
 }
 const clean = text => String(text).replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '');
@@ -85,6 +93,7 @@ export async function runTerminal(args = process.argv.slice(2)) {
     for (const e of data.events || []) {
       cursor = Math.max(cursor, e.seq);
       console.log(clean(`\n[${new Date(e.at).toLocaleTimeString('pt-BR')}] ${e.type.toUpperCase()}${e.channel ? ' · ' + e.channel : ''}\n${e.text}`));
+      if(e.type==='agente'&&e.channel==='whatsapp')console.log(clean(`Aguardando sua resposta no WhatsApp de +${initial.session.phone}. As autorizações aparecerão aqui.`));
     }
     if (data.session?.closed) { ended = true; rl.close(); }
     if (!ended && process.stdout.isTTY) rl.prompt(true);
@@ -104,11 +113,12 @@ export async function runTerminal(args = process.argv.slice(2)) {
   };
   const onSignal = () => { void stop(); };
   process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal); rl.on('SIGINT', onSignal);
-  console.log(clean(`\nSessão ${id.slice(0, 8)} · cliente +${initial.session.phone}\n${options.mode === 'whatsapp' ? 'Converse pelo WhatsApp. Digite as autorizações aqui. Use /enviar TEXTO para iniciar a abordagem.' : 'Escreva abaixo como cliente. Os códigos de autorização chegam ao WhatsApp do admin.'}\n/ajuda mostra os comandos; /sair encerra.\n`));
+  console.log(clean(`\nSessão ${id.slice(0, 8)} · cliente +${initial.session.phone}\n${options.mode === 'whatsapp' ? 'Converse pelo WhatsApp. Digite as autorizações aqui.'+(options.noOpening?' Use /enviar TEXTO para iniciar a abordagem.':' Vou enviar a primeira abordagem agora.') : 'Escreva abaixo como cliente. Os códigos de autorização chegam ao WhatsApp do admin.'}\n/ajuda mostra os comandos; /sair encerra.\n`));
   rl.setPrompt(options.mode === 'whatsapp' ? 'admin> ' : 'cliente> '); show(initial);
   timer = setTimeout(poll, 500);
   try {
-    if (options.opening) await api(`/${id}/input`, { kind: 'opening', text: options.opening });
+    const opening=openingFor(options);
+    if(opening)await api(`/${id}/input`,{kind:'opening',text:opening});
     for await (const input of lines) {
       const line = input.trim(); if (!line) { rl.prompt(); continue; }
       if (line === '/sair') break;
