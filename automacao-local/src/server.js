@@ -12,7 +12,7 @@ import { AgentWorker } from './agent/worker.js';
 import { configureHealth, providerHealth, askModel } from './agent/llm.js';
 import { formatNotice, parseCommand } from './agent/notify.js';
 import { execFile } from 'node:child_process';
-import { normalizePhone, samePhone, phoneVariants, Supervisor, ADMIN_HELP } from './admin.js';
+import { normalizePhone, samePhone, phoneVariants, adminMessageAllowed, Supervisor, ADMIN_HELP } from './admin.js';
 import { validateText } from './agent/validator.js';
 import { POLICY_VERSION, calculateQuote, renderQuote,COMMERCIAL_REPLIES } from './agent/commercial.js';
 import { FollowupWorker } from './followups.js';
@@ -148,6 +148,8 @@ async function catchUp() {
         if (!address) continue;
         for (const m of await conversationSince(address, Date.now() / 1000 - 48 * 3600)) {
           if(isOwner(phone)){
+            const account=normalizePhone(client.info?.wid?.user||client.info?.wid?._serialized?.split('@')[0]);
+            if(!adminMessageAllowed(phone,account,m.fromMe,ownerPhone))continue;
             if(m.t*1000>=journal.manualCaptureSince()&&!journal.isAutomation(m.id,phone,m.body,m.t*1000)&&!internalSendingBodies.has(m.body))runAdmin(m.id,phone,m.body);
             continue;
           }

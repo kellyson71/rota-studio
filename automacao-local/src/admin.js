@@ -11,6 +11,7 @@ export function normalizePhone(value) {
   return /^[1-9]\d{9,14}$/.test(digits) ? digits : null;
 }
 export const samePhone=(a,b)=> { const x=normalizePhone(a),y=normalizePhone(b);return Boolean(x&&y&&phoneKey(x)===phoneKey(y)); };
+export const adminMessageAllowed=(sender,account,fromMe,admin)=>samePhone(sender,admin)&&(!fromMe||samePhone(account,admin));
 export function phoneVariants(value){
  const phone=normalizePhone(value);if(!phone)return [];
  const variants=[phone];

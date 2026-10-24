@@ -7,12 +7,19 @@ import {handleInbound,stageOf} from '../src/agent/agent.js';
 import {validate,validateText} from '../src/agent/validator.js';
 import {conversationFacts} from '../src/agent/context.js';
 import {calculateQuote,renderQuote,commercialResponse} from '../src/agent/commercial.js';
-import {Supervisor,normalizePhone,samePhone,parseAdmin} from '../src/admin.js';
+import {Supervisor,normalizePhone,samePhone,parseAdmin,adminMessageAllowed} from '../src/admin.js';
 import {Runner} from '../src/runner.js';
 import {Journal} from '../src/journal.js';
 import {AgentWorker} from '../src/agent/worker.js';
 
 const kb=JSON.parse(readFileSync(new URL('../src/agent/kb.json',import.meta.url)));
+test('varredura só aceita comandos recebidos do admin ou escritos na própria conta admin',()=>{
+ const admin='558499990000',other='5584888882222';
+ assert.equal(adminMessageAllowed(admin,other,false,admin),true);
+ assert.equal(adminMessageAllowed(admin,admin,true,admin),true);
+ assert.equal(adminMessageAllowed(admin,other,true,admin),false);
+ assert.equal(adminMessageAllowed(other,admin,false,admin),false);
+});
 const safe={acao:'responder',intencao:'duvida',urgencia:false,temperatura:'morno',confianca:.95,resposta:'Posso explicar por aqui.',motivo:'teste'};
 const invoke=decision=>handleInbound({message:'Pode me explicar o painel?',kb,mode:'live',llm:async()=>({json:decision})});
 test('nenhuma ação diferente de responder autoriza envio, inclusive rascunho',async()=>{
