@@ -17,12 +17,18 @@ export function isOptOut(text) {
 }
 
 export class Runner {
-  constructor({ rpc, journal, whatsapp, pause = humanPause }) { Object.assign(this, { rpc, journal, whatsapp, pause }); this.busy = false; }
+  constructor({ rpc, journal, whatsapp, pause = humanPause, validateJob = () => [] }) { Object.assign(this, { rpc, journal, whatsapp, pause, validateJob }); this.busy = false; }
   async flush() {
+    for (const row of this.journal.manuals?.() || []) {
+      await this.rpc('wa_manual_outbound', JSON.parse(row.payload)); this.journal.manualDone(row.id);
+    }
     // Respostas primeiro: cancelam os próximos agendamentos antes de buscar tarefas.
     for (const row of this.journal.replies()) {
       await this.rpc('wa_reply', JSON.parse(row.payload));
       this.journal.replyDone(row.id);
+    }
+    for (const row of this.journal.partsPending?.() || []) {
+      await this.rpc('wa_part_record', { p_id:row.job_id,p_claim:row.claim,p_index:row.part_index,p_body:row.body,p_remote_id:row.remote_id });this.journal.partSynced(row.job_id,row.part_index);
     }
     for (const row of this.journal.pending()) {
       await this.rpc('wa_finish', { p_id: row.id, p_claim: row.claim, p_status: row.status, p_remote_id: row.remote_id, p_error: row.error });
@@ -39,26 +45,32 @@ export class Runner {
       if (!job || !this.journal.begin(job)) return;
       let attempted = false;
       try {
+        const issues = await this.validateJob(job);
+        if (issues.length) throw new Error('Política de envio: ' + issues.join('; '));
         const address = await this.whatsapp.resolve(job.phone);
         if (!address) throw new Error('Número não encontrado no WhatsApp');
         if (this.whatsapp.beforeSend) await this.whatsapp.beforeSend(address, job);
         await this.flush();
-        if (!await this.rpc('wa_can_send', { p_id: job.id, p_claim: job.claim_token })) {
-          this.journal.finish(job.id, 'cancelled');
-          return;
-        }
-        if (!this.whatsapp.ready) throw new Error('WhatsApp desconectou antes do envio');
-        attempted = true;
         const parts = splitParts(job.body);
         let remoteId = null;
         for (let i = 0; i < parts.length; i++) {
           if (i > 0) await this.pause();
+          if (i > 0 && this.whatsapp.beforeSend) await this.whatsapp.beforeSend(address,job);
+          await this.flush();
+          if (!this.whatsapp.ready) throw new Error('WhatsApp desconectou antes da próxima parte');
+          if (!await this.rpc('wa_can_send', { p_id:job.id,p_claim:job.claim_token })) {
+            this.journal.finish(job.id,i ? 'uncertain' : 'cancelled',remoteId,i ? 'Interrompida após parte confirmada; confira a conversa' : 'Envio cancelado pela política');
+            await this.flush();return;
+          }
           try {
             const startedAt = Date.now();
+            this.journal.partBegin?.(job,i,parts[i]);
+            attempted = true;
             const sent = await this.whatsapp.send(address, parts[i]);
             // Sem id no retorno da biblioteca, confere na conversa qual mensagem acabou de sair.
             const id = msgId(sent?.id) || await this.whatsapp.confirm?.(address, parts[i], startedAt, sent);
             if (!id) throw new Error('WhatsApp não retornou confirmação');
+            this.journal.partFinish?.(job.id,i,id);
             remoteId ??= id;
           } catch (error) {
             if (i === 0) throw error;

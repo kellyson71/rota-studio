@@ -1,5 +1,8 @@
 # WhatsApp local da Indexa
 
+**Operação atual do agente e supervisor:** veja [OPERACAO.md](OPERACAO.md), com
+comandos do administrador, políticas de conversa, catálogo e retornos.
+
 O painel público da Indexa usa o login existente da equipe. Os agendamentos ficam
 no Supabase; este processo no PC busca as tarefas por HTTPS e envia pelo WhatsApp
 Web. Não é preciso expor uma porta do PC à internet. O PC precisa estar ligado,
@@ -7,9 +10,10 @@ com internet e com a sessão do WhatsApp conectada.
 
 ## Ativar
 
-1. Aplicar `../supabase/migrations/20261023_whatsapp.sql` no projeto Supabase da
-   Indexa, depois do schema existente. A migração é transacional e deve ser aplicada
-   uma vez. Não cria agendamentos nem altera contatos existentes.
+1. Aplicar as migrações de `../supabase/migrations/` em ordem, até
+   `20261029_retornos_supervisionados.sql`, depois do schema existente. Cada uma
+   deve ser aplicada uma vez. As políticas novas invalidam sugestões antigas;
+   consulte as instruções de atualização em OPERACAO.md.
 2. Publicar as mudanças do site. Abrir `/painel#whatsapp` com o login da equipe.
 3. Clicar em **Vincular computador** e baixar a conexão. O token aparece uma vez.
 4. Instalar as dependências neste diretório:
@@ -32,8 +36,9 @@ Para executar sem serviço: `npm start`. O endereço com chave local fica em
 
 ## Comportamento
 
-- Mensagens de texto individuais, preparadas e agendadas pela equipe. A confirmação
-  na tela é a autorização do envio; não há resposta automática por IA.
+- Primeiras abordagens são preparadas e revisadas pela equipe. Respostas podem
+  ser automáticas dentro das políticas; exceções chegam ao administrador pelo
+  WhatsApp. O painel mostra o modo real do agente em cada computador.
 - Intervalo inicial de 60 segundos entre execuções. Horário marcado é o horário
   mais cedo; a fila pode atrasar. Esse intervalo é operacional, não uma garantia
   contra restrições da conta.
@@ -56,7 +61,8 @@ Para executar sem serviço: `npm start`. O endereço com chave local fica em
   promete entrega exatamente uma vez entre dois serviços independentes.
 - “Enviada” significa que o WhatsApp retornou um identificador. Não é uma indicação
   de leitura ou de entrega ao destinatário.
-- O painel mostra os 100 agendamentos e as 30 respostas mais recentes.
+- O painel mostra os 100 agendamentos e as 30 respostas mais recentes, partes
+  confirmadas e conversas assumidas pela pessoa responsável.
 
 ## Dados e acesso
 

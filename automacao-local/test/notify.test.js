@@ -14,9 +14,9 @@ test('comandos de aprovação exigem o código; mensagens comuns não são coman
 test('notificação traz código, cliente, sugestão e como responder; sem sugestão pede edição', () => {
   const id = 'a1b2c3d4-0000-4000-8000-000000000000';
   const n = formatNotice({ id, name: '[TESTE] Kellyson', body: 'quanto custa?', suggestion: 'Começa em R$ 1.500.', decision: { intencao: 'preco', urgencia: true, temperatura: 'quente' } });
-  assert.equal(codeOf(id), 'A1B2');
-  assert.match(n, /A1B2/); assert.match(n, /URGENTE · pediu preço · quente/); assert.match(n, /“quanto custa\?”/); assert.match(n, /\*ok A1B2\*/);
+  assert.equal(codeOf(id), 'A1B2C3D4');
+  assert.match(n, /A1B2/); assert.match(n, /URGENTE · pediu preço · quente/); assert.match(n, /“quanto custa\?”/); assert.match(n, /\*ok A1B2C3D4\*/);
   const vazio = formatNotice({ id, name: 'X', body: 'é robô?', suggestion: '', decision: { why: 'perguntou se é robô' } });
-  assert.match(vazio, /Sem sugestão \(perguntou se é robô\)/); assert.doesNotMatch(vazio, /\*ok A1B2\*/);
+  assert.match(vazio, /Sem sugestão \(perguntou se é robô\)/); assert.doesNotMatch(vazio, /\*ok A1B2C3D4\*/);
   assert.match(formatNotice({ id, name: 'X', body: 'oi', suggestion: 's' }, { reminder: true }), /Ainda esperando/);
 });

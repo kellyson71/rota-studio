@@ -13,7 +13,7 @@ const run = (message, json, extra = {}) => handleInbound({ message, kb, llm: fak
 
 test('regras fixas respondem sem chamar o modelo', async () => {
   let calls = 0; const llm = async () => { calls++; return { json: good }; };
-  for (const [text, rule] of [['Ok, obrigado!', 'ack'], ['Quem é você?', 'who'], ['Qual o site?', 'site'], ['PARAR', 'optout']]) {
+  for (const [text, rule] of [['Quem é você?', 'who'], ['Qual o site?', 'site'], ['PARAR', 'optout']]) {
     const r = await handleInbound({ message: text, kb, llm, mode: 'live' });
     assert.equal(r.final, 'send'); assert.equal(r.rule, rule);
   }
@@ -26,8 +26,16 @@ test('variações de descadastro são reconhecidas pelo código, sem o modelo', 
   assert.equal((await run('Me manda o preço', good)).rule, undefined);
 });
 test('emoji sozinho não gera resposta', async () => { assert.equal((await run('👍', good)).final, 'ignore'); });
-test('"lembrete automático" do produto não é confundido com robô', () => {
-  assert.equal(validate({ ...good, resposta: 'O sistema manda lembrete automático no WhatsApp' }, { kb }).length, 0);
+test('produto da clínica não promete automação no WhatsApp; template e botão manual são permitidos', () => {
+  for (const resposta of ['O sistema manda lembrete automático no WhatsApp', 'Os avisos saem sozinhos pelo WhatsApp', 'O zap envia mensagens programadas']) {
+    const issues = validate({ ...good, resposta }, { kb });
+    assert.ok(issues.some(i => i.includes('não é uma funcionalidade')), resposta);
+    assert.ok(!issues.includes('menciona ser automatizado'), 'limite do produto é diferente de identidade do atendente');
+  }
+  assert.equal(validate({ ...good, resposta: 'A mensagem fica pronta e um botão abre o WhatsApp para você enviar manualmente.' }, { kb }).length, 0);
+  const prompt = buildPrompt({ kb, history: [], message: 'como funciona?' });
+  assert.ok(!prompt.includes('o lembrete sai sozinho'));
+  assert.ok(prompt.includes('a recepção abre o WhatsApp com a mensagem pronta e envia manualmente'));
   assert.ok(validate({ ...good, resposta: 'Esta é uma resposta automática' }, { kb }).length > 0);
 });
 test('pedido de parar bloqueia o contato', async () => {
@@ -52,7 +60,7 @@ test('validador barra valor, desconto, teto, prazo, link, robô e repetição', 
   assert.ok(bad('Posso fazer 50% de desconto').some(i => i.includes('desconto')));
   assert.ok(bad('Meu máximo é 10% de desconto').some(i => i.includes('teto')));
   assert.ok(bad('Fica pronto em 2 dias').some(i => i.includes('prazo')));
-  assert.equal(bad('Fica pronto em 3 a 7 dias').length, 0);
+  assert.ok(bad('Fica pronto em 3 a 7 dias').length > 0, 'faixa antiga não autoriza compromisso de entrega');
   assert.ok(bad('Veja em http://golpe.com/x').some(i => i.includes('link')));
   assert.ok(bad('Não sou um robô, sou pessoa').length > 0);
   assert.ok(bad('Garantimos o topo do Google').some(i => i.includes('proibida')));
@@ -71,10 +79,10 @@ test('resposta que cita prazo vira rascunho mesmo sendo segura', async () => {
   const r = await run('quanto tempo leva?', { ...good, resposta: 'Em torno de 3 semanas, confirmo na proposta. Qual o tamanho da equipe?' });
   assert.equal(r.final, 'draft'); assert.match(r.why, /prazo/);
 });
-test('só o preço de referência do contato pode ser citado', () => {
+test('referência antiga não autoriza preço fora do motor comercial', () => {
   const price = 'R$ 1.500 de implantação + R$ 150/mês';
   const t = r => validate({ ...good, resposta: r }, { kb, contactPrice: price });
-  assert.equal(t('Começa em R$ 1.500 de implantação e R$ 150/mês, conforme o escopo').length, 0);
+  assert.ok(t('Começa em R$ 1.500 de implantação e R$ 150/mês, conforme o escopo').length > 0);
   assert.ok(t('Sai por R$ 900').some(i => i.includes('valor')));
   assert.ok(validate({ ...good, resposta: 'Sai por R$ 150' }, { kb }).some(i => i.includes('valor')));
 });
@@ -83,7 +91,7 @@ test('horário de atendimento responde por regra', async () => {
 });
 test('sem prazos cadastrados, qualquer prazo numérico é barrado', () => {
   assert.ok(validate({ ...good, resposta: 'Fica pronto em 5 dias' }, { kb: { ...kb, prazos: {} } }).some(i => i.includes('prazo')));
-  assert.equal(validate({ ...good, resposta: 'Um site fica pronto em poucas semanas' }, { kb: { ...kb, prazos: {} } }).length, 0);
+  assert.ok(validate({ ...good, resposta: 'Um site fica pronto em poucas semanas' }, { kb: { ...kb, prazos: {} } }).length > 0);
 });
 test('horário comercial em Fortaleza', () => {
   assert.equal(inBusinessHours(new Date('2026-10-23T15:00:00Z')), true);   // sex 12h

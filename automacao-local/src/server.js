@@ -9,9 +9,13 @@ import QRCode from 'qrcode';
 import { Journal } from './journal.js';
 import { Runner, isOptOut, phoneKey, msgId } from './runner.js';
 import { AgentWorker } from './agent/worker.js';
-import { configureHealth, providerHealth } from './agent/llm.js';
+import { configureHealth, providerHealth, askModel } from './agent/llm.js';
 import { formatNotice, parseCommand } from './agent/notify.js';
 import { execFile } from 'node:child_process';
+import { normalizePhone, samePhone, phoneVariants, Supervisor, ADMIN_HELP } from './admin.js';
+import { validateText } from './agent/validator.js';
+import { POLICY_VERSION, calculateQuote, renderQuote,COMMERCIAL_REPLIES } from './agent/commercial.js';
+import { FollowupWorker } from './followups.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = process.env.INDEXA_DATA_DIR || path.join(root, 'data');
@@ -25,24 +29,33 @@ const localSecret = fs.readFileSync(localSecretPath, 'utf8').trim();
 configureHealth({ file: path.join(dataDir, 'llm-health.json') });
 // Número do dono: recebe os rascunhos para aprovar e é o único que pode mandar comandos (data/agent.json).
 const agentConfig = (() => { try { return JSON.parse(fs.readFileSync(path.join(dataDir, 'agent.json'), 'utf8')); } catch { return {}; } })();
-const ownerPhone = String(agentConfig.ownerPhone || '').replace(/\D/g, '');
-const isOwner = phone => Boolean(ownerPhone) && phoneKey(phone) === phoneKey(ownerPhone);
+const ownerPhone = normalizePhone(agentConfig.ownerPhone) || '';
+const runtimeMode=agentConfig.mode==='live'&&ownerPhone?'live':'shadow';
+const isOwner = phone => samePhone(ownerPhone,phone);
 let journal;
 let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : null;
 let cloud, runner, client, starting = false, stopping = false, qr = null, status = 'offline', lastError = null, cloudError = null;
 let watched = new Set(), watchedPhones = [], worker, catching = false, authSince = 0;
+let supervisor,followups, adminChain=Promise.resolve(),noticesBusy=false;
+const internalSendingBodies=new Set();
 const addressOf = new Map(); // telefone → id da conversa no WhatsApp (resolvido uma vez)
 const kb = JSON.parse(fs.readFileSync(new URL('./agent/kb.json', import.meta.url), 'utf8'));
+function validateDelivery(text,decision={}) {
+  let approvedText=COMMERCIAL_REPLIES.includes(text)?text:null;
+  if(decision.quote){try{const quote=calculateQuote(decision.quote);const rendered=renderQuote(quote);if(rendered===text)approvedText=rendered;else return ['proposta difere do cálculo autorizado'];}catch(error){return [error.message];}}
+  return validateText(text,{kb,approvedText});
+}
 const adapter = {
   get ready() { return status === 'ready'; },
   resolve: async phone => {
     watched.add(phoneKey(phone));
-    try { return (await client.getNumberId(phone))?._serialized; }
+    try { for(const candidate of phoneVariants(phone)){const id=(await client.getNumberId(candidate))?._serialized;if(id)return id;}return null; }
     catch (error) { throw new Error(`Falha ao localizar o número (${error.message})`); }
   },
   beforeSend: async (address, job) => {
     // Recupera respostas recebidas enquanto o PC estava desligado.
-    for (const message of await inboundSince(address, new Date(job.created_at).getTime() / 1000)) {
+    for (const message of await conversationSince(address, new Date(job.created_at).getTime() / 1000)) {
+      if(message.fromMe){captureManual(message,job.phone);continue;}
       journal.reply({ p_id: message.id, p_phone: job.phone, p_body: message.body || `[${message.type}]`, p_received_at: new Date(message.t * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
     }
   },
@@ -77,26 +90,51 @@ function setupCloud() {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: (url, opts) => fetch(url, { ...opts, signal: AbortSignal.timeout(20000) }) }
   });
-  runner = new Runner({ rpc, journal, whatsapp: adapter });
-  worker = new AgentWorker({ rpc, journal, kb, mode: agentConfig.mode === 'live' ? 'live' : 'shadow', autoLimit: Number(agentConfig.autoLimit) || 10,
-    onAuto: draft => execFile('notify-send', ['-a', 'Indexa', `Respondido sozinho: ${draft.name || 'contato'}`, draft.suggestion.slice(0, 160)], () => {}),
+  runner = new Runner({ rpc, journal, whatsapp: adapter,validateJob:job=>validateDelivery(job.body,job.decision) });
+  followups=new FollowupWorker({rpc,flush:()=>runner.flush(),holidays:agentConfig.businessHolidays || []});
+  supervisor=new Supervisor({adminPhone:ownerPhone,rpc,ask:askModel,validateApproval:(text,draft)=>validateDelivery(text,draft.decision),onResume:async phone=>{
+    const ctx=await rpc('wa_agent_context',{p_phone:phone});
+    const latest=(ctx.history||[]).find(h=>h.id===ctx.latestInboundId);
+    const answered=latest&&(ctx.history||[]).some(h=>h.de==='eu'&&new Date(h.em)>=new Date(latest.em));
+    if(ctx.owner!=='human'&&ctx.latestInboundId&&!answered)journal.agentReopen(ctx.latestInboundId);
+  }});
+  if(ownerPhone)journal.noticeEnqueue(`admin-onboarding:${ownerPhone}:${POLICY_VERSION}`,ADMIN_HELP);
+  worker = new AgentWorker({ rpc, journal, kb, mode: runtimeMode, autoLimit: Number(agentConfig.autoLimit) || 10,debounceMs:8000,beforeProcess:()=>runner.flush(),
+    notifyFailure:({task,error})=>journal.noticeEnqueue(`agent-error:${task.id}`,`A resposta de +${task.phone} precisa de você. O processamento falhou após as tentativas: ${error.message}. Consulte pendências ou responda ao cliente manualmente.`),
+    onAuto: draft => execFile('notify-send', ['-a', 'Indexa', `Resposta autorizada na fila: ${draft.name || 'contato'}`, draft.suggestion.slice(0, 160)], () => {}),
     notify: draft => {
     execFile('notify-send', ['-a', 'Indexa', `Rascunho do agente: ${draft.name || 'contato'}`, `${draft.body.slice(0, 120)}\n→ ${draft.decision.why}`], () => {});
     if (ownerPhone) { journal.noticeEnqueue(`draft:${draft.id}`, formatNotice(draft)); journal.reminderSet(draft.id, Date.now()); }
   } });
 }
 // Lê o modelo da conversa direto: WWebJS.getChat quebra ao serializar conversas com identificador @lid.
-async function inboundSince(address, since) {
+async function conversationSince(address, since) {
   try {
     return await client.pupPage.evaluate((id, since) => {
       const chat = window.require('WAWebCollections').Chat.get(id);
       if (!chat) return [];
       const ignore = ['call_log', 'e2e_notification', 'gp2', 'notification', 'notification_template', 'protocol'];
       return chat.msgs.getModelsArray()
-        .filter(m => !m.id.fromMe && m.t >= since && !ignore.includes(m.type))
-        .slice(-50).map(m => ({ id: String(m.id.toString()), body: m.body || '', type: m.type, t: m.t }));
+        .filter(m => m.t >= since && !ignore.includes(m.type))
+        .slice(-100).map(m => ({ id: String(m.id.toString()), body: m.body || '', type: m.type, t: m.t,fromMe:Boolean(m.id.fromMe) }));
     }, address, since);
   } catch (error) { throw new Error(`Falha ao conferir respostas (${error.message})`); }
+}
+function captureManual(m,phone){
+  if(m.t*1000<journal.manualCaptureSince()||isOwner(phone)||journal.isAutomation(m.id,phone,m.body,m.t*1000))return;
+  journal.manual({p_id:m.id,p_phone:phone,p_body:m.body||`[${m.type}]`,p_sent_at:new Date(m.t*1000).toISOString()});
+}
+async function peerPhone(address){
+  for(const [phone,id] of addressOf)if(id===address)return phone;
+  if(String(address).endsWith('@lid')) {const pairs=await client.getContactLidAndPhone([address]);return normalizePhone(pairs?.[0]?.pn?.split('@')[0]);}
+  return normalizePhone(String(address||'').split('@')[0]);
+}
+function runAdmin(id,phone,body){
+  if(!cloud||!supervisor||!isOwner(phone)||!journal.commandFirst(id))return;
+  adminChain=adminChain.then(async()=>{
+    let reply;try{reply=await supervisor.handle(phone,body);}catch(error){reply=`Não executei: ${error.message}`;}
+    if(reply){journal.adminEvent(id,phone,body,reply);journal.noticeEnqueue(`admin:${id}`,reply);}
+  }).catch(error=>{lastError=`Supervisor: ${error.message}`.slice(0,200);});
 }
 // Rede de segurança: mensagens que chegaram com o PC desligado, reiniciando ou antes de o WhatsApp ficar pronto.
 async function catchUp() {
@@ -108,9 +146,12 @@ async function catchUp() {
         if (!addressOf.has(phone)) addressOf.set(phone, await adapter.resolve(phone));
         const address = addressOf.get(phone);
         if (!address) continue;
-        for (const m of await inboundSince(address, Date.now() / 1000 - 48 * 3600)) {
-          const command = isOwner(phone) && parseCommand(m.body);
-          if (command) { await runCommand(m.id, command); continue; }
+        for (const m of await conversationSince(address, Date.now() / 1000 - 48 * 3600)) {
+          if(isOwner(phone)){
+            if(m.t*1000>=journal.manualCaptureSince()&&!journal.isAutomation(m.id,phone,m.body,m.t*1000)&&!internalSendingBodies.has(m.body))runAdmin(m.id,phone,m.body);
+            continue;
+          }
+          if(m.fromMe){captureManual(m,phone);continue;}
           if (!watched.has(phoneKey(phone))) continue;
           if (journal.agentSeen(m.id)) continue; // já foi registrada e enfileirada antes
           journal.reply({ p_id: m.id, p_phone: phone, p_body: m.body || `[${m.type}]`, p_received_at: new Date(m.t * 1000).toISOString(), p_optout: isOptOut(m.body || '') });
@@ -121,26 +162,24 @@ async function catchUp() {
   } finally { catching = false; }
 }
 // Aprovação pelo WhatsApp: decide no banco e responde ao dono na mesma conversa.
-async function runCommand(id, command) {
-  if (!cloud || !journal.commandFirst(id)) return;
-  let reply;
-  try {
-    const result = await rpc('wa_draft_decide_device', { p_code: command.code, p_action: command.action, p_text: command.text || null });
-    reply = result.status === 'approved' ? `✅ ${command.code} aprovado${command.text ? ' com o seu texto' : ''}: sai em até 1 minuto para ${result.name}.` : `🗑️ ${command.code} descartado.`;
-  } catch (error) { reply = `⚠️ ${error.message}`; }
-  journal.noticeEnqueue(`reply:${id}`, reply);
-}
 async function sendNotices() {
-  if (!ownerPhone || status !== 'ready') return;
+  if (!ownerPhone || status !== 'ready'||noticesBusy) return;
+  noticesBusy=true;
+  try{
   const pending = journal.noticesPending();
   if (!pending.length) return;
   if (!addressOf.has(ownerPhone)) addressOf.set(ownerPhone, await adapter.resolve(ownerPhone));
   const address = addressOf.get(ownerPhone);
   if (!address) { lastError = 'Número do dono não encontrado no WhatsApp'; return; }
+  const draftNotices=pending.some(n=>/^(draft|remind):/.test(n.id));
+  const activeDrafts=draftNotices?new Set((await rpc('wa_drafts_pending')).map(d=>d.id)):null;
   for (const n of pending) {
-    try { await client.sendMessage(address, n.body, { sendSeen: false }); journal.noticeSent(n.id); }
+    if(/^(draft|remind):/.test(n.id)&&!activeDrafts.has(n.id.split(':')[1])){journal.noticeSent(n.id);continue;}
+    try { internalSendingBodies.add(n.body);journal.internalStart(`notice:${n.id}:${n.attempts}`,ownerPhone,n.body);const startedAt=Date.now();const sent=await client.sendMessage(address, n.body, { sendSeen: false });const id=msgId(sent?.id)||await adapter.confirm(address,n.body,startedAt,sent);if(!id)throw new Error('Aviso ao administrador sem confirmação do WhatsApp');journal.automationSeen(id);journal.noticeSent(n.id); }
     catch (error) { journal.noticeFail(n.id); lastError = `Aviso ao dono: ${error.message}`.slice(0, 200); }
+    finally {setTimeout(()=>internalSendingBodies.delete(n.body),15000);}
   }
+  }finally{noticesBusy=false;}
 }
 // Rascunho parado há 2 h: lembra o dono, só de segunda a sexta entre 9h e 22h.
 const ownerAwake = (d = new Date()) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Fortaleza', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(d).map(x => [x.type, x.value])); return !['Sat', 'Sun'].includes(p.weekday) && +p.hour >= 9 && +p.hour < 22; };
@@ -164,6 +203,7 @@ async function connect() {
   status = 'starting'; lastError = null; qr = null;
   try {
     // Valida o vínculo antes de abrir o navegador.
+    await rpc('wa_policy_config',{p_mode:runtimeMode,p_limit:Number(agentConfig.autoLimit)||10,p_version:POLICY_VERSION});
     await rpc('wa_heartbeat', { p_status: status });
     if (client) await client.destroy().catch(() => {});
     client = new wwebjs.Client({
@@ -190,12 +230,24 @@ async function connect() {
         const body = message.body || `[${message.type}]`;
         const mid = msgId(message.id);
         if (!mid) { lastError = 'Resposta recebida sem identificador; não foi registrada'; return; }
-        const command = isOwner(phone) && parseCommand(message.body);
-        if (command) return void runCommand(mid, command);
+        if(isOwner(phone))return runAdmin(mid,phone,body);
         if (!watched.has(phoneKey(phone))) return;
         journal.reply({ p_id: mid, p_phone: phone, p_body: body, p_received_at: new Date(message.timestamp * 1000).toISOString(), p_optout: isOptOut(message.body || '') });
         journal.agentEnqueue({ id: mid, phone, body });
       } catch (error) { lastError = `Falha ao registrar resposta: ${error.message}`; }
+    });
+    client.on('message_create',async message=>{
+      if(!message.fromMe||stopping)return;
+      try{
+        const mid=msgId(message.id);if(!mid||internalSendingBodies.has(message.body))return;
+        const address=message.to;if(!address||/@(g\.us|broadcast|newsletter)$/.test(address))return;
+        const phone=await peerPhone(address);if(!phone)return;
+        // Conversa consigo mesmo também serve como console, se o número conectado é o admin.
+        const account=normalizePhone(client.info?.wid?.user||client.info?.wid?._serialized?.split('@')[0]);
+        if(isOwner(phone)&&isOwner(account)) {if(!journal.isAutomation(mid,phone,message.body,message.timestamp*1000))runAdmin(mid,phone,message.body);return;}
+        if(!watched.has(phoneKey(phone)))return;
+        captureManual({id:mid,body:message.body,type:message.type,t:message.timestamp},phone);
+      }catch(error){lastError=`Saída manual: ${error.message}`.slice(0,200);}
     });
     await client.initialize();
   } catch (error) { status = 'error'; lastError = error.message; await heartbeat(); }
@@ -217,7 +269,7 @@ app.use('/api', (req, res, next) => {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return res.status(401).json({ error: 'Abra o endereço com a chave local, conforme o arquivo de acesso.' });
   next();
 });
-app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone), modoAgente: agentConfig.mode === 'live' ? 'live' : 'shadow' }));
+app.get('/api/status', (_req, res) => res.json({ configured: Boolean(config), status, qr, error: lastError, cloudError, agent: providerHealth(), aprovacaoPeloWhatsApp: Boolean(ownerPhone),adminPhone:ownerPhone||null, modoAgente:runtimeMode }));
 app.post('/api/config', async (req, res) => {
   if (config) return res.status(409).json({ error: 'Este executor já está vinculado. Para trocar, pare o serviço e remova data/connection.json.' });
   const { supabaseUrl, supabaseKey, token } = req.body;
@@ -256,6 +308,7 @@ const noticeTimer = setInterval(() => { if (!stopping) void sendNotices().catch(
 const remindTimer = setInterval(() => { if (!stopping) void remind().catch(() => {}); }, 10 * 60000);
 // Rede de segurança rápida: leitura local das conversas monitoradas, sem consultar o WhatsApp.
 const catchUpTimer = setInterval(() => { if (!stopping) void catchUp(); }, 20000);
+const followupTimer=setInterval(()=>{if(!stopping&&followups&&status==='ready')void followups.tick().catch(error=>{cloudError=`Retornos: ${error.message}`;});},60000);
 // Vigia: a biblioteca às vezes não emite "ready" mesmo com o WhatsApp Web totalmente carregado.
 // Com a página saudável, libera o estado pronto; sem isso, recria a conexão. A varredura cobre o tempo real.
 async function pageHealthy() {
@@ -274,7 +327,7 @@ const reconnectTimer = setInterval(async () => {
 async function shutdown() {
   if (stopping) return;
   stopping = true;
-  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(catchUpTimer); clearInterval(noticeTimer); clearInterval(remindTimer); clearInterval(reconnectTimer);
+  clearInterval(heartbeatTimer); clearInterval(workTimer); clearInterval(agentTimer); clearInterval(catchUpTimer); clearInterval(noticeTimer); clearInterval(remindTimer); clearInterval(reconnectTimer);clearInterval(followupTimer);
   server.close();
   const kill = setTimeout(() => process.exit(0), 12000);
   status = 'offline'; qr = null;

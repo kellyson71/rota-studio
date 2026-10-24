@@ -21,6 +21,7 @@ const ADDRESS = /^(qual (o )?endereco|onde (voces )?(ficam|fica)|onde (e|eh) (o 
 const SITE = /^(qual (e )?o (seu |de voces )?(site|link)|tem site|voces tem site|cade o site|manda o site)\??$/;
 
 const MEDIA = /^\[(ptt|audio|image|video|document|sticker|location|vcard|multi_vcard)\]$/;
+const PAYMENT_CLAIM = /\b(ja (?:paguei|pago|transferi)|pagamento (?:feito|realizado|concluido)|segue (?:o )?comprovante|fiz (?:o )?(?:pix|pagamento))\b/;
 
 export function route({ text, kb, blocked = false }) {
   const t = norm(text);
@@ -31,6 +32,7 @@ export function route({ text, kb, blocked = false }) {
   if (COMPLAINT.test(t)) return { kind: 'handoff', rule: 'complaint', complaint: true, block: true, reason: 'reclamação ou desconfiança; sem resposta automática' };
   if (ROBOT.test(t)) return { kind: 'handoff', rule: 'robot', reason: 'perguntou se é robô; responder apenas com você' };
   if (PROBE.test(t)) return { kind: 'handoff', rule: 'probe', reason: 'testando se é robô ou tentando desviar o atendimento; fica com você' };
+  if (PAYMENT_CLAIM.test(t)) return { kind: 'handoff', rule: 'payment', reason: 'cliente informou pagamento; verifique a transação antes de confirmar ou iniciar' };
   if (ACK.test(t)) return { kind: 'rule', rule: 'ack', reply: 'Por nada! Qualquer coisa é só me chamar por aqui.' };
   if (WHO.test(t) && kb.quemSou) return { kind: 'rule', rule: 'who', reply: kb.quemSou };
   if (HOURS.test(t) && kb.horario) return { kind: 'rule', rule: 'hours', reply: kb.horario };

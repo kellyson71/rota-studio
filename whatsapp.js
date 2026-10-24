@@ -1,6 +1,6 @@
 /* Agendamentos no Supabase; execução exclusivamente no computador vinculado. */
 (() => {
-  let state = { devices: [], messages: [], replies: [], blocks: [], drafts: [] };
+  let state = { devices: [], messages: [], replies: [], blocks: [], drafts: [], conversations: [], parts: [] };
   let pendingCount = 0, badgeTimer;
   let timer, loading = false, draft = {}, filter = 'all', requestId = null;
   const labels = { offline: 'PC desconectado', starting: 'Abrindo WhatsApp', qr: 'Escaneie o QR', authenticated: 'Carregando conversas', ready: 'Conectado', error: 'Precisa de atenção', queued: 'Agendada', sending: 'Enviando', sent: 'Enviada', failed: 'Falhou antes do envio', uncertain: 'Conferir no WhatsApp', cancelled: 'Cancelada' };
@@ -20,7 +20,8 @@
   };
   const badge = (status, text) => `<span class="wa-badge ${esc(status)}">${esc(text || labels[status] || status)}</span>`;
   const alive = d => d.heartbeat_at && Date.now() - new Date(d.heartbeat_at).getTime() < 45000;
-  const messageFor = c => (c?.status === 'Aguardando resposta' && c.followupMessage?.trim()) || c?.message?.trim() || `Oi${c?.person ? ', ' + c.person : ''}, tudo bem? Sou o Kellyson, desenvolvedor aqui de Pau dos Ferros. Como vocês cuidam disso hoje no dia a dia?`;
+  const legacyMessageFor = c => (c?.status === 'Aguardando resposta' && c.followupMessage?.trim()) || c?.message?.trim() || `Oi${c?.person ? ', ' + c.person : ''}, tudo bem? Sou o Kellyson, desenvolvedor aqui de Pau dos Ferros. Como vocês cuidam disso hoje no dia a dia?`;
+  const messageFor = c => legacyMessageFor(c).replace(/lembretes? autom[aá]ticos?(?: no WhatsApp)?/gi, "mensagens prontas para envio manual pelo WhatsApp");
   const remember = () => { const f = document.querySelector('#wa-compose'); if (f) draft = Object.fromEntries(new FormData(f)); };
 
   function page() {
@@ -44,11 +45,11 @@
     <div class="wa-section-head"><div><span class="kicker">03 · acompanhar</span><h2>Fila e histórico</h2></div><select data-native id="wa-filter" aria-label="Filtrar envios"><option value="all">Todos os estados</option><option value="queued">Agendadas</option><option value="sent">Enviadas</option><option value="attention">Precisam de atenção</option><option value="cancelled">Canceladas</option></select></div>
     <section class="wa-card" id="wa-jobs"><p class="wa-empty">Carregando os últimos 100 envios…</p></section>
     <div class="wa-section-head"><h2>Respostas recebidas</h2></div><section class="wa-card wa-replies" id="wa-replies"><p class="wa-empty">As respostas aparecerão aqui.</p></section>
-    <details class="wa-card" style="margin-top:20px"><summary>Lista de não contatar</summary><div id="wa-blocks"></div></details>`;
+    <section class="wa-card" id="wa-human" style="margin-top:20px" hidden></section><details class="wa-card" style="margin-top:20px"><summary>Lista de não contatar</summary><div id="wa-blocks"></div></details>`;
   }
 
   function errorText(error) {
-    if (/wa_|schema cache|does not exist|Could not find/i.test(error.message || '')) return 'A estrutura de agendamentos ainda não está instalada no banco. Aplique a migração supabase/migrations/20261023_whatsapp.sql no Supabase deste projeto.';
+    if (['PGRST202','PGRST205','42P01'].includes(error.code) || /schema cache|relation .* does not exist|Could not find the (function|table)/i.test(error.message || '')) return 'A atualização do banco ainda está pendente. O administrador precisa concluir a instalação desta versão.';
     return error.message || String(error);
   }
   function showError(error) {
@@ -75,7 +76,7 @@
     if (!state.drafts.length) return;
     const active = document.activeElement?.closest?.('.wa-draft')?.dataset.id;
     const typed = Object.fromEntries([...box.querySelectorAll('textarea[data-draft]')].map(t => [t.dataset.draft, t.value]));
-    box.innerHTML = `<span class="kicker">agente · modo sombra</span><h2>Respostas para aprovar (${state.drafts.length})</h2><p class="hint">Nada sai sem você. Edite o texto e aprove, ou descarte e responda pelo seu celular.</p>` + state.drafts.map(r => {
+    box.innerHTML = `<span class="kicker">agente · revisão de respostas</span><h2>Respostas para aprovar (${state.drafts.length})</h2><p class="hint">Respostas que exigem decisão ficam aqui. O modo de cada computador aparece na conexão; o automático respeita o catálogo e as pausas.</p>` + state.drafts.map(r => {
       const c = Store.contacts.find(c => c.id === r.contact_id), d = r.decision || {};
       const text = typed[r.id] ?? r.suggestion;
       return `<article class="wa-job wa-draft" data-id="${esc(r.id)}"><div class="wa-job-head"><div><strong>${esc(c?.name || '+' + r.phone)}</strong><small> · +${esc(r.phone)} · ${date(r.created_at)}</small></div><div>${d.urgencia ? chip('Urgente', 'failed') : ''}${d.temperatura ? chip(d.temperatura) : ''}${d.intencao ? chip(d.intencao) : ''}</div></div>
@@ -89,19 +90,29 @@
   }
   function draw() {
     drawDrafts();
+    const humanBox = document.querySelector('#wa-human');
+    const humanConversations=state.conversations || [];
+    humanBox.hidden=!humanConversations.length;
+    humanBox.innerHTML='<h2>Conversas com você</h2>'+humanConversations.map(c=>`<div class="wa-job"><strong>+${esc(c.phone)}</strong><p>${esc(c.pause_reason || 'Você assumiu esta conversa')}</p><button class="btn small" data-wa="conversation-resume" data-device="${esc(c.device_id)}" data-phone="${esc(c.phone)}" type="button">Liberar próximas respostas do agente</button></div>`).join('');
     const devSelect = document.querySelector('#wa-device');
     const desired = devSelect.value || draft.device;
     const choices = state.devices.filter(d => d.enabled);
     devSelect.innerHTML = choices.length ? choices.map(d => `<option value="${esc(d.id)}">${esc(d.name)}${alive(d) && d.status === 'ready' ? '' : ' · desconectado'}</option>`).join('') : '<option value="">Vincule um computador</option>';
     if (choices.some(d => d.id === desired)) devSelect.value = desired;
-    document.querySelector('#wa-devices').innerHTML = state.devices.filter(d => d.enabled).map(d => `<div class="wa-device"><div class="wa-device-head"><strong>${esc(d.name)}</strong>${badge(alive(d) ? d.status : 'offline', d.paused ? 'Fila pausada' : null)}</div><p class="hint">Último sinal: ${date(d.heartbeat_at)} · intervalo de ${d.interval_seconds}s entre envios</p>${d.last_error ? `<p class="wa-error">${esc(d.last_error)}</p>` : ''}${alive(d) && d.status === 'qr' && /^data:image\/png;base64,/.test(d.qr || '') ? `<img class="wa-qr" alt="QR Code para conectar seu WhatsApp" src="${esc(d.qr)}"><p class="hint">WhatsApp → Dispositivos conectados → Conectar dispositivo.</p>` : ''}<div class="form-actions"><button class="btn small" type="button" data-wa="pause" data-id="${esc(d.id)}">${d.paused ? 'Retomar fila' : 'Pausar fila'}</button><button class="btn ghost small" type="button" data-wa="revoke" data-id="${esc(d.id)}">Revogar acesso</button></div></div>`).join('') || '<p class="wa-empty">Vincule este PC para começar. Ele buscará os agendamentos pela internet.</p>';
+    document.querySelector('#wa-devices').innerHTML = state.devices.filter(d => d.enabled).map(d => `<div class="wa-device"><div class="wa-device-head"><strong>${esc(d.name)}</strong>${badge(alive(d) ? d.status : 'offline', d.paused ? 'Fila pausada' : null)}</div><p class="hint">Último sinal: ${date(d.heartbeat_at)} · intervalo de ${d.interval_seconds}s entre envios</p><p class="hint"><strong>${d.agent_mode === "live" ? "Automático com limites" : d.agent_mode === "shadow" ? "Somente rascunhos" : "Modo ainda não informado"}</strong> · ${d.auto_limit || 10} respostas automáticas por contato</p>${d.last_error ? `<p class="wa-error">${esc(d.last_error)}</p>` : ''}${alive(d) && d.status === 'qr' && /^data:image\/png;base64,/.test(d.qr || '') ? `<img class="wa-qr" alt="QR Code para conectar seu WhatsApp" src="${esc(d.qr)}"><p class="hint">WhatsApp → Dispositivos conectados → Conectar dispositivo.</p>` : ''}<div class="form-actions"><button class="btn small" type="button" data-wa="pause" data-id="${esc(d.id)}">${d.paused ? 'Retomar fila' : 'Pausar fila'}</button><button class="btn ghost small" type="button" data-wa="revoke" data-id="${esc(d.id)}">Revogar acesso</button></div></div>`).join('') || '<p class="wa-empty">Vincule este PC para começar. Ele buscará os agendamentos pela internet.</p>';
     const jobs = state.messages.filter(m => filter === 'all' || (filter === 'attention' ? ['failed','uncertain'].includes(m.status) : m.status === filter));
-    document.querySelector('#wa-jobs').innerHTML = jobs.map(m => `<article class="wa-job"><div class="wa-job-head"><div><strong>${esc(m.name)}</strong><small> · +${esc(m.phone)}</small></div>${badge(m.status)}</div><small>Agendado: ${date(m.scheduled_at)}${m.sent_at ? ' · enviado: ' + date(m.sent_at) : ''}</small><p>${esc(m.body)}</p>${m.last_error ? `<p class="hint">${esc(m.last_error)}</p>` : ''}${m.status === 'queued' ? `<button class="btn small" type="button" data-wa="cancel" data-id="${esc(m.id)}">Cancelar envio</button>` : ''}${['failed','uncertain','cancelled'].includes(m.status) ? `<button class="btn small" type="button" data-wa="reuse" data-id="${esc(m.id)}">${m.status === 'uncertain' ? 'Conferi no WhatsApp · preparar novo envio' : 'Preparar novo agendamento'}</button>` : ''} <button class="btn ghost small" type="button" data-wa="block" data-phone="${esc(m.phone)}">Não contatar</button></article>`).join('') || '<p class="wa-empty">Nenhum envio neste filtro. Prepare a primeira mensagem acima.</p>';
+    document.querySelector('#wa-jobs').innerHTML = jobs.map(m => `<article class="wa-job"><div class="wa-job-head"><div><strong>${esc(m.name)}</strong><small> · +${esc(m.phone)}</small></div>${badge(m.status)}</div><small>Agendado: ${date(m.scheduled_at)}${m.sent_at ? ' · enviado: ' + date(m.sent_at) : ''}</small><p>${esc(m.body)}</p>${(state.parts || []).some(p=>p.message_id===m.id)?`<small>${(state.parts || []).filter(p=>p.message_id===m.id).length} parte(s) com confirmação do WhatsApp</small>`:""}${m.last_error ? `<p class="hint">${esc(m.last_error)}</p>` : ''}${m.status === 'queued' ? `<button class="btn small" type="button" data-wa="cancel" data-id="${esc(m.id)}">Cancelar envio</button>` : ''}${['failed','uncertain','cancelled'].includes(m.status) ? `<button class="btn small" type="button" data-wa="reuse" data-id="${esc(m.id)}">${m.status === 'uncertain' ? 'Conferi no WhatsApp · preparar novo envio' : 'Preparar novo agendamento'}</button>` : ''} <button class="btn ghost small" type="button" data-wa="block" data-phone="${esc(m.phone)}">Não contatar</button></article>`).join('') || '<p class="wa-empty">Nenhum envio neste filtro. Prepare a primeira mensagem acima.</p>';
     document.querySelector('#wa-replies').innerHTML = state.replies.map(r => `<article class="wa-job"><div class="wa-job-head"><strong>+${esc(r.phone)}</strong><small>${date(r.received_at)}</small></div><p>${esc(r.body)}</p><a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${esc(r.phone)}">Continuar no WhatsApp ↗</a></article>`).join('') || '<p class="wa-empty">Quando um contato agendado responder, a mensagem aparece aqui e os próximos envios dele são cancelados.</p>';
     document.querySelector('#wa-blocks').innerHTML = state.blocks.map(b => `<div class="wa-job-head wa-job"><span>+${esc(b.phone)} · ${esc(b.reason)}</span><button class="btn small" type="button" data-wa="unblock" data-phone="${esc(b.phone)}">Liberar contato</button></div>`).join('') || '<p class="wa-empty">Nenhum contato bloqueado.</p>';
   }
   async function action(button) {
     const { wa, id } = button.dataset;
+    if (wa === 'conversation-resume') {
+      button.disabled=true;
+      try { await Store.waRpc('wa_conversation_control',{p_device:button.dataset.device,p_phone:button.dataset.phone,p_paused:false});await refresh(); }
+      catch(error){showError(error);}finally{button.disabled=false;}
+      return;
+    }
     if (wa === 'draft-approve' || wa === 'draft-reject') {
       const approve = wa === 'draft-approve', text = document.querySelector(`textarea[data-draft="${id}"]`)?.value || '';
       if (approve && /\{[^}]+\}/.test(text)) return showError(new Error('Substitua os campos entre chaves antes de aprovar.'));
@@ -218,7 +229,7 @@
     timer = setInterval(() => { if (!document.querySelector('#wa-compose')) return clearInterval(timer); if (!document.hidden) void refresh(); }, 10000);
   }
   window.addEventListener('hashchange', remember);
-  Store.onChange(reason => { if (reason === 'auth' && !Store.user) { draft = {}; state = { devices: [], messages: [], replies: [], blocks: [], drafts: [] }; pendingCount = 0; clearInterval(timer); clearInterval(badgeTimer); } });
+  Store.onChange(reason => { if (reason === 'auth' && !Store.user) { draft = {}; state = { devices: [], messages: [], replies: [], blocks: [], drafts: [], conversations: [], parts: [] }; pendingCount = 0; clearInterval(timer); clearInterval(badgeTimer); } });
   // Contador do menu: consulta leve a cada 30s enquanto a equipe está logada.
   async function updateBadge() {
     if (document.hidden) return;

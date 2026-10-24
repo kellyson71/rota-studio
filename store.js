@@ -172,16 +172,18 @@
   Store.waLoad = async () => {
     if (!client || !Store.member) throw new Error("O agendamento precisa do login da equipe e do Supabase.");
     const results = await Promise.all([
-      client.from("wa_devices").select("id,name,enabled,paused,interval_seconds,status,heartbeat_at,qr,last_error,created_at").order("created_at"),
+      client.from("wa_devices").select("id,name,enabled,paused,interval_seconds,status,heartbeat_at,qr,last_error,created_at,agent_mode,auto_limit,policy_version").order("created_at"),
       client.from("wa_messages").select("*").order("created_at", { ascending: false }).limit(100),
       client.from("wa_replies").select("*").order("received_at", { ascending: false }).limit(30),
       client.from("wa_blocks").select("*"),
-      client.from("wa_drafts").select("*").eq("status", "pending").order("created_at").limit(30)
+      client.from("wa_drafts").select("*").eq("status", "pending").order("created_at").limit(30),
+      client.from("wa_conversations").select("device_id,phone,owner,pause_reason,version").eq("owner","human"),
+      client.from("wa_message_parts").select("message_id,part_index,remote_id,sent_at").order("sent_at",{ascending:false}).limit(300)
     ]);
     const failed = results.slice(0, 4).find(r => r.error);
     if (failed) throw failed.error;
     // Rascunhos são opcionais: sem a migração do agente a aba continua funcionando.
-    return Object.fromEntries(["devices", "messages", "replies", "blocks", "drafts"].map((key, i) => [key, results[i].data || []]));
+    return Object.fromEntries(["devices", "messages", "replies", "blocks", "drafts", "conversations", "parts"].map((key, i) => [key, results[i].data || []]));
   };
   Store.waDraftCount = async () => {
     if (!client || !Store.member) return 0;

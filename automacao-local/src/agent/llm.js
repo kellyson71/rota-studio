@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 function sandboxDir() {
   const dir = path.join(os.tmpdir(), 'indexa-agent-sandbox');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(dir, 'opencode.json'), JSON.stringify({ $schema: 'https://opencode.ai/config.json', permission: { bash: 'deny', edit: 'deny', webfetch: 'deny', read: 'deny', external_directory: 'deny' } }));
+  fs.writeFileSync(path.join(dir, 'opencode.json'), JSON.stringify({ $schema: 'https://opencode.ai/config.json', permission: { '*': 'deny' }, tools: { '*': false } }));
   return dir;
 }
 
@@ -85,7 +85,7 @@ function spawnCli(label, cmd, args, { timeoutMs, signal }) {
   });
 }
 
-const runAgy = (prompt, { timeoutMs, signal }) => spawnCli('agy', 'agy', ['-p', prompt, '--mode', 'plan', '--effort', 'low', '--output-format', 'text'], { timeoutMs, signal });
+const runAgy = (prompt, { timeoutMs, signal }) => spawnCli('agy', 'agy', ['-p', prompt, '--mode', 'plan', '--sandbox', '--disable-slash-commands', '--effort', 'low', '--output-format', 'text'], { timeoutMs, signal });
 const runOpencode = model => (prompt, { timeoutMs, signal }) => spawnCli(model, 'opencode', ['run', '--pure', '-m', model, prompt], { timeoutMs, signal });
 
 const DATA_DIR = process.env.INDEXA_DATA_DIR || fileURLToPath(new URL('../../data', import.meta.url));
